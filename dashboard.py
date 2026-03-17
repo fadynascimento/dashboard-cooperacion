@@ -49,11 +49,10 @@ def load_data(url):
         df_raw = pd.read_csv(f"{url}&ts={int(time.time())}")
         df_raw.columns = [c.strip() for c in df_raw.columns]
         
-        # Garantia de colunas necessárias
         required_cols = ['LAYER', 'inicio_zulu', 'fim_zulu', 'lat', 'lon', 'aeronave', 'missao', 'status_foco', 'horario_solucao']
         for col in required_cols:
             if col not in df_raw.columns:
-                df_raw[col] = None
+                df_raw[col] = ""
         
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
@@ -70,10 +69,9 @@ df = load_data(URL_PLANILHA)
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
 
-# --- LÓGICA DE ALERTA DE EMERGÊNCIA (COM MITIGAÇÃO) ---
+# --- LÓGICA DE ALERTA DE EMERGÊNCIA ---
 focos_ativos = False
 if df is not None:
-    # O alerta só pulsa se o LAYER for Focos Incd E o status NÃO for Extinto ou Controlado
     focos_ativos = not df[
         (df['LAYER'].str.contains("Focos Incd", case=False, na=False)) & 
         (~df['status_foco'].str.contains("Extinto|Controlado", case=False, na=False))
@@ -165,7 +163,6 @@ if df is not None:
         
         for _, row in df_filtered.iterrows():
             if row['lat_clean'] is not None and row['lon_clean'] is not None:
-                # Cor dinâmica para o ícone de incêndio
                 fogo_extinto = str(row['status_foco']).lower() in ['extinto', 'controlado']
                 icon_map = {
                     'Meteorologia': ('cloud', 'lightgray'), 
@@ -173,9 +170,20 @@ if df is not None:
                     'Meios Aéreos': ('plane', 'cadetblue')
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
+                
+                # Customizando o conteúdo do Balão (Popup)
+                popup_text = f"""
+                <div style='font-family: Arial; font-size: 12px; width: 200px;'>
+                    <b>Local/Prefixo:</b> {row['aeronave']}<br>
+                    <b>Informação:</b><br><code style='background:#f0f0f0; padding:2px;'>{row['missao']}</code><br>
+                    <b>Status:</b> {row['status_foco'] if row['status_foco'] else 'N/A'}<br>
+                    <b>Solução:</b> {row['horario_solucao'] if row['horario_solucao'] else '-'}
+                </div>
+                """
+                
                 folium.Marker(
                     [row['lat_clean'], row['lon_clean']], 
-                    popup=f"<b>{row['aeronave']}</b><br>Status: {row['status_foco'] if row['status_foco'] else 'N/A'}", 
+                    popup=folium.Popup(popup_text, max_width=250), 
                     icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')
                 ).add_to(m)
         
@@ -195,8 +203,8 @@ if df is not None:
             df_resumo = df_ma.groupby(['aeronave', 'missao']).size().reset_index(name='QTD')
             df_resumo.columns = ['AERONAVE', 'TIPO DE MISSÃO', 'QTD']
             st.dataframe(df_resumo, hide_index=True, use_container_width=True)
-        
         st.markdown('</div>', unsafe_allow_html=True)
+
         if focos_ativos:
             st.error("🚨 FOCOS DE INCÊNDIO ATIVOS")
 
