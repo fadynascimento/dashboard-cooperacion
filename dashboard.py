@@ -181,13 +181,11 @@ if df is not None:
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                # LÓGICA DE POPUP DIFERENCIADA PARA METAR
+                # AJUSTE DO POPUP: SUPRESSÃO DE RÓTULOS PARA METAR
                 if is_met:
                     popup_text = f"""
-                    <div style='font-family: Arial; font-size: 12px; width: 220px;'>
-                        <b style='color:#003366;'>ESTAÇÃO:</b> {row['aeronave']}<br>
-                        <b style='color:#003366;'>METAR:</b><br>
-                        <code style='background:#f4f4f4; display:block; padding:8px; margin-top:5px; border-left:3px solid #00d4ff;'>{row['missao']}</code>
+                    <div style='font-family: monospace; font-size: 13px; width: 240px; background:#f4f4f4; padding:10px; border-radius:5px; border-left:4px solid #00d4ff;'>
+                        {row['missao']}
                     </div>
                     """
                 else:
@@ -203,7 +201,7 @@ if df is not None:
                 
                 folium.Marker(
                     [row['lat_clean'], row['lon_clean']], 
-                    popup=folium.Popup(popup_text, max_width=250), 
+                    popup=folium.Popup(popup_text, max_width=280), 
                     icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')
                 ).add_to(m)
         
@@ -218,7 +216,6 @@ if df is not None:
         sm1.metric("VETORES", df_ma['aeronave'].nunique() if not df_ma.empty else 0)
         sm2.metric("MISSÕES", len(df_ma) if not df_ma.empty else 0)
         
-        st.write("**Resumo por Aeronave e Missão:**")
         if not df_ma.empty:
             df_resumo = df_ma.groupby(['aeronave', 'missao']).size().reset_index(name='QTD')
             df_resumo.columns = ['AERONAVE', 'TIPO DE MISSÃO', 'QTD']
