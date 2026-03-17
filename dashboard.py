@@ -33,16 +33,23 @@ def parse_coordinate(coord):
     except: return None
 
 def format_to_military(decimal_coord, is_lat=True):
-    if decimal_coord is None: return ""
-    abs_val = abs(decimal_coord)
-    degrees = int(abs_val)
-    minutes = int((abs_val - degrees) * 60)
-    seconds = int((abs_val - degrees - minutes/60) * 3600)
-    if is_lat:
-        designator = "S" if decimal_coord < 0 else "N"
-    else:
-        designator = "W" if decimal_coord < 0 else "E"
-    return f"{degrees:02d}°{minutes:02d}'{seconds:02d}\"{designator}"
+    # --- CORREÇÃO DO ERRO (Value Error Protection) ---
+    if decimal_coord is None or pd.isna(decimal_coord): 
+        return "N/A"
+    
+    try:
+        abs_val = abs(decimal_coord)
+        degrees = int(abs_val)
+        minutes = int((abs_val - degrees) * 60)
+        seconds = int((abs_val - degrees - minutes/60) * 3600)
+        
+        if is_lat:
+            designator = "S" if decimal_coord < 0 else "N"
+        else:
+            designator = "W" if decimal_coord < 0 else "E"
+        return f"{degrees:02d}°{minutes:02d}'{seconds:02d}\"{designator}"
+    except:
+        return "N/A"
 
 def get_base64(bin_file):
     if os.path.exists(bin_file):
@@ -70,7 +77,7 @@ def load_data(url):
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
         
-        # Coluna auxiliar para o texto da Timeline (Aeronave <br> Missão)
+        # Coluna auxiliar para o texto da Timeline
         df_raw['label_timeline'] = df_raw['aeronave'] + "<br>" + df_raw['missao']
         
         df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
@@ -104,10 +111,7 @@ st.markdown(f"""
     [data-testid="stVerticalBlock"] > div {{ padding-top: 0.1rem; padding-bottom: 0.1rem; }}
     html, body, [data-testid="stTickBarMin"] {{ color: white !important; }}
     p, span, label, div, h1, h2, h3, h4, h5, h6 {{ color: white !important; }}
-    
     .stApp {{ background-color: #001233; }}
-    
-    /* Cabeçalho Ajustado */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; height: 80px;
         background: rgba(0, 18, 51, 0.95); z-index: 999;
@@ -119,13 +123,10 @@ st.markdown(f"""
         font-family: 'Arial Black', sans-serif; color: white; letter-spacing: 2px; 
         font-size: 1.4rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 10px #00d4ff;
     }}
-    
-    /* Relógio Zulu em destaque */
     .time-block {{ text-align: left; border-left: 4px solid #00d4ff; padding-left: 12px; }}
     .time-label {{ color:#00d4ff; font-size:0.7rem; font-weight:bold; margin:0; }}
     .time-value {{ font-size:2.2rem; color:white; font-family:monospace; font-weight:bold; margin:0; line-height:0.9;}}
     .time-local {{ color:#ffcc00; font-size:0.9rem; font-weight:bold; margin:0; }}
-
     .main-content {{ margin-top: 85px; }}
     .map-outer-frame {{
         padding: 2px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;
@@ -159,7 +160,6 @@ st.markdown(f"""
 
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
 if logo_b64:
-    # Aumentado para width 110
     st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="110"></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
@@ -176,14 +176,12 @@ if df is not None:
         show_foc = lt2.toggle("🔥 Focos Incd", value=True, key="t2")
         show_aero = lt3.toggle("✈️ Medios aéreos", value=True, key="t3")
         
-        active_layers = ["Meteorologia", "Focos Incd", "Meios Aéreos"]
-        # Filtragem dinâmica baseada nos toggles
-        layers_to_hide = []
-        if not show_met: layers_to_hide.append("Meteorologia")
-        if not show_foc: layers_to_hide.append("Focos Incd")
-        if not show_aero: layers_to_hide.append("Meios Aéreos")
+        active_layers = []
+        if show_met: active_layers.append("Meteorologia")
+        if show_foc: active_layers.append("Focos Incd")
+        if show_aero: active_layers.append("Meios Aéreos")
         
-        df_mapa = df[~df['LAYER'].isin(layers_to_hide)]
+        df_mapa = df[df['LAYER'].isin(active_layers)]
         
         m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', zoom_control=False, attribution_control=False)
         
@@ -195,6 +193,8 @@ if df is not None:
                     'Meios Aéreos': ('plane', 'cadetblue')
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
+                
+                # CHAMADA SEGURA DA FUNÇÃO
                 lat_mil = format_to_military(row['lat_clean'], is_lat=True)
                 lon_mil = format_to_military(row['lon_clean'], is_lat=False)
                 
@@ -217,32 +217,16 @@ if df is not None:
         st.markdown('</div>', unsafe_allow_html=True)
         if focos_ativos: st.error("🚨 FOCOS ACTIVOS")
 
-    # --- LÍNEA DE TIEMPO AJUSTADA ---
+    # --- LÍNEA DE TIEMPO ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:0.8rem; margin:0;">LÍNEA DE TIEMPO (Z)</p>', unsafe_allow_html=True)
     
     df_timeline = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     
     if not df_timeline.empty:
-        # Criado gráfico com a coluna 'label_timeline' para exibir ambos os textos
-        fig = px.timeline(
-            df_timeline, 
-            x_start="inicio_zulu", 
-            x_end="fim_zulu", 
-            y="aeronave", 
-            color="aeronave", 
-            text="label_timeline", 
-            template="plotly_dark"
-        )
+        fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="label_timeline", template="plotly_dark")
         fig.add_vline(x=now_z, line_width=2, line_color="#ff4b4b")
-        
-        # Ajuste de texto interno: posição e fonte
-        fig.update_traces(
-            textposition='inside', 
-            insidetextanchor='middle',
-            textfont=dict(color='white', size=11)
-        )
-        
+        fig.update_traces(textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=11))
         fig.update_layout(
             xaxis_range=[now_z - timedelta(hours=3), now_z + timedelta(hours=7)],
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,212,255,0.02)',
