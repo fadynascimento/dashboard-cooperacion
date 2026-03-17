@@ -38,11 +38,10 @@ def get_base64(bin_file):
             return base64.b64encode(f.read()).decode()
     return None
 
-# --- ARQUIVOS E DADOS ---
+# --- CARREGAMENTO DE DADOS (BLINDADO) ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxvtVEGGjxGS316VCXhFUDv7AA9WaPSNql8ncUFu6Kn0d39BPr7XMS6WSSn8JJ6VAVDUAJ9AshQ1bi/pub?output=csv"
 ARQUIVO_BOLACHA = "bolcaha cooperacion.png"
 
-# --- CARREGAMENTO DE DADOS ---
 @st.cache_data(ttl=5)
 def load_data(url):
     try:
@@ -53,6 +52,9 @@ def load_data(url):
         for col in required_cols:
             if col not in df_raw.columns:
                 df_raw[col] = ""
+        
+        df_raw['status_foco'] = df_raw['status_foco'].astype(str).replace('nan', '')
+        df_raw['LAYER'] = df_raw['LAYER'].astype(str).replace('nan', '')
         
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
@@ -65,11 +67,14 @@ def load_data(url):
 
 df = load_data(URL_PLANILHA)
 
-# --- TEMPO ---
+# --- LÓGICA DE TEMPO ---
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
 
-# --- LÓGICA DE ALERTA DE EMERGÊNCIA ---
+# Lógica do Contador (baseado no ciclo de 15s)
+segundos_restantes = 15 - (int(time.time()) % 15)
+
+# --- LÓGICA DE ALERTA ---
 focos_ativos = False
 if df is not None:
     focos_ativos = not df[
@@ -93,16 +98,21 @@ st.markdown(f"""
     header {{ visibility: hidden; height: 0; }}
     footer {{ visibility: hidden; }}
     [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"] {{ display: none !important; }}
-    .stApp {{ background-color: #001233; background-attachment: fixed; }}
+    .stApp {{ background-color: #001233; }}
+    
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 95px;
-        background: rgba(0, 18, 51, 0.85); z-index: 999;
+        position: fixed; top: 0; left: 0; width: 100%; height: 105px;
+        background: rgba(0, 18, 51, 0.9); z-index: 999;
         display: flex; align-items: center; justify-content: center;
         border-bottom: 2px solid rgba(0, 212, 255, 0.5); backdrop-filter: blur(10px);
     }}
     .title-text {{
         font-family: 'Arial Black', sans-serif; color: white; letter-spacing: 10px; 
         font-size: 2.2rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 15px #00d4ff;
+    }}
+    .refresh-bar {{
+        color: #00ff7f; font-size: 0.65rem; font-family: monospace;
+        margin-top: 5px; text-transform: uppercase; letter-spacing: 2px;
     }}
     .map-outer-frame {{
         padding: 10px; background: rgba(0, 0, 0, 0.2); border-radius: 20px;
@@ -118,17 +128,18 @@ st.markdown(f"""
         border-radius: 12px; padding: 20px; box-shadow: 0 0 30px rgba(0, 212, 255, 0.15); margin-top: 20px;
     }}
     .fixed-logo {{ position: fixed; top: 5px; right: 25px; z-index: 1001; }}
-    .main-content {{ margin-top: 110px; }}
+    .main-content {{ margin-top: 125px; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER ---
+# --- HEADER COM CONTADOR ---
 st.markdown(f"""
     <div class="fixed-header">
         <div style="position: absolute; left: 20px; text-align: left; border-left: 3px solid #00d4ff; padding-left: 15px;">
             <div style="color:#00d4ff; font-size:0.7rem; font-weight:bold;">HORÁRIO ZULU (UTC)</div>
             <div style="font-size:1.6rem; color:white; font-family:monospace; font-weight:bold;">{now_z.strftime('%H:%M:%S')} Z</div>
             <div style="color:#ffcc00; font-size:0.8rem; font-weight:bold;">Local (P): {now_p.strftime('%H:%M')} P</div>
+            <div class="refresh-bar">Próxima Sincronização em {segundos_restantes}s</div>
         </div>
         <div class="title-text">COOPERACIÓN XI</div>
     </div>
@@ -163,7 +174,7 @@ if df is not None:
         
         for _, row in df_filtered.iterrows():
             if row['lat_clean'] is not None and row['lon_clean'] is not None:
-                fogo_extinto = str(row['status_foco']).lower() in ['extinto', 'controlado']
+                fogo_extinto = "extinto" in str(row['status_foco']).lower() or "controlado" in str(row['status_foco']).lower()
                 icon_map = {
                     'Meteorologia': ('cloud', 'lightgray'), 
                     'Focos Incd': ('fire', 'green' if fogo_extinto else 'red'), 
@@ -171,13 +182,13 @@ if df is not None:
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                # Customizando o conteúdo do Balão (Popup)
                 popup_text = f"""
-                <div style='font-family: Arial; font-size: 12px; width: 200px;'>
-                    <b>Local/Prefixo:</b> {row['aeronave']}<br>
-                    <b>Informação:</b><br><code style='background:#f0f0f0; padding:2px;'>{row['missao']}</code><br>
-                    <b>Status:</b> {row['status_foco'] if row['status_foco'] else 'N/A'}<br>
-                    <b>Solução:</b> {row['horario_solucao'] if row['horario_solucao'] else '-'}
+                <div style='font-family: Arial; font-size: 12px; width: 220px;'>
+                    <b style='color:#003366;'>LOCAL/ID:</b> {row['aeronave']}<br>
+                    <b style='color:#003366;'>INFO/METAR:</b><br><code style='background:#f4f4f4; display:block; padding:5px; margin-top:2px;'>{row['missao']}</code>
+                    <hr style='margin:5px 0;'>
+                    <b>STATUS:</b> {row['status_foco']}<br>
+                    <b>SOLUÇÃO:</b> {row['horario_solucao']}
                 </div>
                 """
                 
@@ -208,7 +219,7 @@ if df is not None:
         if focos_ativos:
             st.error("🚨 FOCOS DE INCÊNDIO ATIVOS")
 
-    # --- GRÁFICO DE AÇÕES (Z) ---
+    # --- AÇÕES (Z) ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
     st.markdown(f"""<div style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom:10px;">AÇÕES (Z)</div>""", unsafe_allow_html=True)
     
