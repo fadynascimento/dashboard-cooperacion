@@ -12,14 +12,12 @@ import re
 # --- CONFIGURAÇÃO DA PÁGINA ---
 st.set_page_config(layout="wide", page_title="COOPERACIÓN XI", page_icon="✈️")
 
-# --- FUNÇÃO DE LIMPEZA E CONVERSÃO DE COORDENADAS ---
+# --- FUNÇÕES AUXILIARES ---
 def parse_coordinate(coord):
-    if pd.isna(coord) or str(coord).strip() == "":
-        return None
+    if pd.isna(coord) or str(coord).strip() == "": return None
     c = str(coord).strip().upper().replace(',', '.')
     parts = re.findall(r"[-+]?\d*\.\d+|\d+", c)
-    if not parts:
-        return None
+    if not parts: return None
     try:
         if len(parts) == 1: val = float(parts[0])
         elif len(parts) == 2: val = float(parts[0]) + (float(parts[1]) / 60)
@@ -40,7 +38,7 @@ def get_base64(bin_file):
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxvtVEGGjxGS316VCXhFUDv7AA9WaPSNql8ncUFu6Kn0d39BPr7XMS6WSSn8JJ6VAVDUAJ9AshQ1bi/pub?output=csv"
 ARQUIVO_BOLACHA = "bolcaha cooperacion.png"
 
-# --- ESTILIZAÇÃO CSS (FUNDO MARINHO + ILUMINAÇÃO LATERAL) ---
+# --- ESTILIZAÇÃO CSS ---
 st.markdown(f"""
     <style>
     .stAppDeployButton {{ display: none !important; }}
@@ -69,7 +67,6 @@ st.markdown(f"""
         text-transform: uppercase; text-shadow: 0 0 15px #00d4ff;
     }}
 
-    /* COLUNA LATERAL COM ILUMINAÇÃO SUAVE E SOMBRA */
     .status-panel {{
         background: rgba(0, 30, 70, 0.3);
         border-radius: 15px;
@@ -141,28 +138,17 @@ if df is not None:
         st_folium(m, width="100%", height=380, key="map_v6")
 
     with c2:
-        # INÍCIO DO PAINEL LATERAL COM EFEITOS
         st.markdown('<div class="status-panel">', unsafe_allow_html=True)
         st.markdown("<h4 style='color:#00d4ff; text-align:center;'>📊 STATUS OPERACIONAL</h4>", unsafe_allow_html=True)
-        
         sm1, sm2 = st.columns(2)
         sm1.metric("VETORES", df['aeronave'].nunique())
         sm2.metric("MISSÕES", len(df))
-        
-        # Consolidação de dados para a tabela operacional
-        # Pega a última missão registrada de cada aeronave para definir o "Tipo de Missão" atual/predominante
-        df_status = df.groupby('aeronave').agg({
-            'missao': 'last', 
-            'aeronave': 'size'
-        }).rename(columns={'missao': 'TIPO DE MISSÃO', 'aeronave': 'QTD'}).reset_index()
-        
+        df_status = df.groupby('aeronave').agg({'missao': 'last', 'aeronave': 'size'}).rename(columns={'missao': 'TIPO DE MISSÃO', 'aeronave': 'QTD'}).reset_index()
         st.write("**Resumo por Vetor:**")
-        st.dataframe(df_status[['aeronave', 'TIPO DE MISSÃO', 'QTD']], 
-                     hide_index=True, 
-                     use_container_width=True)
+        st.dataframe(df_status[['aeronave', 'TIPO DE MISSÃO', 'QTD']], hide_index=True, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TIMELINE (320px) ---
+    # --- TIMELINE COM CONTROLES DE ZOOM ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
     st.markdown(f"""
         <div style="text-align: center; margin-bottom: 10px; background: linear-gradient(90deg, transparent, rgba(0, 212, 255, 0.1), transparent); padding: 10px; border-radius: 20px;">
@@ -177,15 +163,19 @@ if df is not None:
     janela_fim = now_z + timedelta(hours=4)
     
     fig.add_vline(x=now_z, line_width=3, line_color="#ff4b4b")
+    
     fig.update_layout(
         xaxis_range=[janela_inicio, janela_fim], 
         paper_bgcolor='rgba(0,0,0,0)', 
         plot_bgcolor='rgba(0,212,255,0.02)', 
         font_color="white", showlegend=False, 
         height=320, 
-        margin=dict(l=10, r=10, t=0, b=10)
+        margin=dict(l=10, r=10, t=0, b=10),
+        # Habilita a barra de ferramentas para Zoom In/Out na Timeline
+        modebar_add=['zoomIn2d', 'zoomOut2d', 'pan2d', 'autoScale2d']
     )
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    
+    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<br><h4 style='color:#00d4ff;'>📝 MANIFESTO DE MISSÕES</h4>", unsafe_allow_html=True)
