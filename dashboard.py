@@ -92,7 +92,7 @@ if df is not None:
         (~df['status_foco'].str.contains("Extinto|Controlado", case=False, na=False))
     ].empty
 
-# --- ESTILO CSS REESTRUTURADO ---
+# --- ESTILO CSS REESTRUTURADO E REFINADO ---
 borda_cor = "rgba(0, 255, 127, 0.4)" if not focos_ativos else "rgba(255, 0, 0, 0.7)"
 animacao = "none" if not focos_ativos else "pulse 1.5s infinite"
 
@@ -108,22 +108,23 @@ st.markdown(f"""
     .block-container {{ padding-top: 0rem; padding-bottom: 0rem; padding-left: 1rem; padding-right: 1rem; }}
     .stApp {{ background-color: #001233; }}
     
-    /* CABEÇALHO COM FOCO EM CENTRALIZAÇÃO */
+    /* CABEÇALHO REFINADO COM EFEITO DE VIDRO */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; height: 120px;
-        background: #001233; z-index: 999;
+        background: rgba(0, 18, 51, 0.9); z-index: 999;
         border-bottom: 2px solid rgba(0, 212, 255, 0.5);
+        backdrop-filter: blur(5px); /* Efeito Frosted Glass */
         padding: 0 30px;
         display: flex;
         align-items: center;
-        justify-content: space-between; /* Relógio à esquerda, espaço vazio à direita */
+        justify-content: space-between;
     }}
 
-    /* RELÓGIO ZULU - À ESQUERDA */
+    /* RELÓGIO ZULU - À ESQUERDA, NÍTIDO E REFINADO */
     .time-block {{
         display: flex;
         align-items: center;
-        margin-right: auto; /* Empurra o resto para a direita */
+        margin-right: auto;
     }}
     .time-value {{ 
         font-size: 5rem; 
@@ -133,31 +134,35 @@ st.markdown(f"""
         line-height: 1;
         letter-spacing: -5px;
         margin-right: 20px;
+        text-shadow: 0 2px 5px rgba(0,0,0,0.5); /* Sombra para leitura nítida */
     }}
     .local-box {{
         display: flex;
         flex-direction: column;
         justify-content: center;
     }}
-    .time-local {{ color: #ffcc00; font-size: 1.5rem; font-weight: bold; margin: 0; }}
+    .time-local {{ color: #ffcc00; font-size: 1.5rem; font-weight: bold; margin: 0; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }}
     
-    /* TÍTULO - CENTRALIZADO NO MEIO EXATO */
+    /* TÍTULO - CENTRALIZADO, LIGEIRAMENTE MAIOR QUE O RELÓGIO E IMPOENTE */
     .title-text {{
         position: absolute;
         left: 50%;
-        transform: translateX(-50%); /* Centralização matemática perfeita */
+        transform: translateX(-50%);
         font-family: 'Arial Black', sans-serif; color: white;
-        font-size: 2.8rem; /* Ligeiramente maior que o relógio visualmente */
+        font-size: 2.8rem; /* Imponente e ligeiramente maior */
         font-weight: 900; text-transform: uppercase;
-        text-shadow: 0 0 15px #00d4ff;
-        white-space: nowrap; /* Impede quebra de linha */
+        text-shadow: 0 0 15px #00d4ff; /* Brilho neon suave */
+        white-space: nowrap;
     }}
 
-    /* LOGO - À DIREITA */
+    /* LOGO - À DIREITA, SEMI-TRANSPARENTE E SUAVE */
     .fixed-logo {{ 
-        margin-left: auto; /* Empurra para a direita */
+        margin-left: auto;
         display: flex;
         align-items: center;
+    }}
+    .fixed-logo img {{
+        opacity: 0.9; /* Suaviza a logo */
     }}
 
     .main-content {{ margin-top: 130px; }}
@@ -178,7 +183,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER REESTRUTURADO ---
+# --- HEADER REESTRUTURADO E REFINADO ---
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
 logo_html = f'<img src="data:image/png;base64,{logo_b64}" width="140">' if logo_b64 else ""
 
@@ -201,7 +206,7 @@ if df is not None:
     c1, c2 = st.columns([2.2, 1])
     
     with c1:
-        st.markdown('<p style="color:#00ff7f; font-size: 1.1rem; margin:0; font-weight:bold;">📍 CONCIENCIA SITUACIONAL</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#00ff7f; font-size: 1.1rem; margin:0; font-weight:bold; text-shadow: 0 1px 3px rgba(0,0,0,0.5);">📍 CONCIENCIA SITUACIONAL</p>', unsafe_allow_html=True)
         st.markdown('<div class="map-outer-frame">', unsafe_allow_html=True)
         
         lt1, lt2, lt3 = st.columns(3)
@@ -223,7 +228,8 @@ if df is not None:
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 lat_mil = format_to_military(row['lat_clean'], is_lat=True)
                 lon_mil = format_to_military(row['lon_clean'], is_lat=False)
-                popup_text = f"<div style='color:black; font-size:11px;'><b>{row['aeronave']}</b><br>{row['missao']}<br>{lat_mil}/{lon_mil}</div>"
+                # Popup com cor forçada para leitura nítida
+                popup_text = f"<div style='color:black !important; font-size:11px; font-family:Arial, sans-serif;'><b>{row['aeronave']}</b><br>{row['missao']}<br>{lat_mil}/{lon_mil}</div>"
                 folium.Marker([row['lat_clean'], row['lon_clean']], popup=folium.Popup(popup_text, max_width=200), icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')).add_to(m)
         
         st_folium(m, width="100%", height=280, key="map_coi")
@@ -231,7 +237,7 @@ if df is not None:
 
     with c2:
         st.markdown('<div class="status-panel">', unsafe_allow_html=True)
-        st.markdown('<p style="color:#00d4ff; text-align:center; font-size:1rem; margin:0; font-weight:bold;">📊 ESTADO OPERATIVO</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#00d4ff; text-align:center; font-size:1rem; margin:0; font-weight:bold; text-shadow: 0 1px 2px rgba(0,0,0,0.3);">📊 ESTADO OPERATIVO</p>', unsafe_allow_html=True)
         df_ma_status = df[df['LAYER'] == "Meios Aéreos"]
         sm1, sm2 = st.columns(2)
         sm1.metric("VECTORES", df_ma_status['aeronave'].nunique() if not df_ma_status.empty else 0)
