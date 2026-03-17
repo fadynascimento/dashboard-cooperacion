@@ -49,7 +49,6 @@ def load_data(url):
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
-        # Garantir que surtidas seja numérico para a soma
         if 'surtidas' not in df_raw.columns: df_raw['surtidas'] = 1
         df_raw['surtidas'] = pd.to_numeric(df_raw['surtidas'], errors='coerce').fillna(1)
         return df_raw
@@ -59,7 +58,7 @@ df = load_data(URL_PLANILHA)
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
 
-# --- ESTILO CSS REFINADO ---
+# --- ESTILO CSS ---
 st.markdown(f"""
     <style>
     .stAppDeployButton {{ display: none !important; }}
@@ -67,37 +66,33 @@ st.markdown(f"""
     [data-testid="stHeader"], [data-testid="stToolbar"] {{ display: none !important; }}
     .stApp {{ background-color: #000b1e; color: white; }}
     .block-container {{ padding: 0 1.5rem; }}
-
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 120px;
+        position: fixed; top: 0; left: 0; width: 100%; height: 110px;
         background: rgba(0, 11, 30, 0.98); z-index: 999;
         display: flex; align-items: center; justify-content: space-between;
         padding: 0 30px; border-bottom: 1px solid rgba(0, 212, 255, 0.2);
     }}
-    .zulu-time {{ font-family: 'Segoe UI', sans-serif; font-size: 1.8rem; font-weight: 300; }}
     .mission-title {{
         position: absolute; left: 50%; transform: translateX(-50%);
-        font-family: 'Arial Black', sans-serif; font-size: 2.5rem;
-        letter-spacing: 4px; text-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+        font-family: 'Arial Black', sans-serif; font-size: 2.3rem;
+        letter-spacing: 3px; text-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
     }}
-    .main-content {{ margin-top: 135px; }}
-    
-    /* Estilo para tabelas e métricas */
+    .main-content {{ margin-top: 125px; }}
     .section-card {{
         background: rgba(0, 30, 70, 0.4); border: 1px solid rgba(0, 212, 255, 0.2);
-        border-radius: 10px; padding: 15px; height: 100%;
+        border-radius: 10px; padding: 15px; margin-bottom: 15px;
     }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER COM BOLACHA AMPLIADA ---
+# --- HEADER ---
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
-logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="110">' if logo_b64 else ""
+logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="100">' if logo_b64 else ""
 
 st.markdown(f"""
     <div class="fixed-header">
         <div class="time-container">
-            <div class="zulu-time">{now_z.strftime('%H:%M')}Z</div>
+            <div style="font-size: 1.8rem; font-weight: 300;">{now_z.strftime('%H:%M')}Z</div>
             <div style="font-size: 0.9rem; color: #ffcc00; font-weight: bold;">LOCAL: {now_p.strftime('%H:%M')}P</div>
         </div>
         <div class="mission-title">COOPERACIÓN XI</div>
@@ -108,64 +103,72 @@ st.markdown(f"""
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
-    # --- LAYOUT PRINCIPAL: MAPA (ESQ) E TABELA DE VETORES (DIR) ---
-    col_mapa, col_tabela = st.columns([2, 1])
+    c_map, c_res = st.columns([2, 1])
     
-    with col_mapa:
+    with c_map:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown('<p style="color:#00ff7f; font-weight:bold; margin-bottom:10px;">📍 CONCIENCIA SITUACIONAL</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#00ff7f; font-weight:bold; margin-bottom:10px;">📍 CONCIENCIA SITUACIONAL INTEGRADA</p>', unsafe_allow_html=True)
         
-        # Filtros rápidos
+        # TODOS OS FILTROS LIGADOS POR PADRÃO CONFORME SOLICITADO
         f1, f2, f3 = st.columns(3)
-        show_met = f1.toggle("☁️ Met", value=True)
-        show_foc = f2.toggle("🔥 Focos", value=True)
-        show_aero = f3.toggle("✈️ Aéreos", value=True)
+        show_aero = f1.toggle("✈️ Meios Aéreos", value=True)
+        show_met = f2.toggle("☁️ Met", value=True)
+        show_foc = f3.toggle("🔥 Focos", value=True)
         
-        m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', 
-                       zoom_control=False, attribution_control=False)
+        m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', zoom_control=False, attribution_control=False)
         
-        # Lógica de visualização de vetores no mapa
         active_layers = []
+        if show_aero: active_layers.append("Meios Aéreos")
         if show_met: active_layers.append("Meteorologia")
         if show_foc: active_layers.append("Focos Incd")
-        if show_aero: active_layers.append("Meios Aéreos")
         
         for _, row in df[df['LAYER'].isin(active_layers)].iterrows():
             if row['lat_clean'] is not None:
-                icon_type = 'plane' if 'Meios' in row['LAYER'] else 'fire'
-                icon_color = 'cadetblue' if 'Meios' in row['LAYER'] else 'red'
+                # Definição de ícones por camada
+                if 'Meios' in row['LAYER']:
+                    icon_type, icon_color = 'plane', 'cadetblue'
+                elif 'Focos' in row['LAYER']:
+                    icon_type, icon_color = 'fire', 'red'
+                else:
+                    icon_type, icon_color = 'cloud', 'lightgray'
+                
                 folium.Marker([row['lat_clean'], row['lon_clean']], 
-                              popup=f"{row['aeronave']}",
+                              popup=f"{row['aeronave']} - {row['missao']}",
                               icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')).add_to(m)
-        
-        st_folium(m, width="100%", height=380, key="map_coi_v2")
+        st_folium(m, width="100%", height=350, key="map_coi")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with col_tabela:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:1.2rem;">📊 RESUMEN DE FLOTA</p>', unsafe_allow_html=True)
-        
-        # Agregando surtidas por aeronave
-        df_resumo = df[df['LAYER'] == "Meios Aéreos"].groupby(['aeronave', 'missao'])['surtidas'].sum().reset_index()
-        df_resumo.columns = ['AERONAVE', 'MISIÓN', 'SALIDAS'] # Tradução para espanhol
-        
-        st.metric("VECTORES ACTIVOS", len(df_resumo))
-        st.dataframe(df_resumo, hide_index=True, use_container_width=True)
+    with c_res:
+        st.markdown('<div class="section-card" style="height: 485px;">', unsafe_allow_html=True)
+        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold;">📊 VECTORES EM OPERAÇÃO</p>', unsafe_allow_html=True)
+        df_vuelo = df[df['LAYER'] == "Meios Aéreos"].groupby(['aeronave', 'missao'])['surtidas'].sum().reset_index()
+        df_vuelo.columns = ['AERONAVE', 'MISIÓN', 'SALIDAS']
+        st.dataframe(df_vuelo, hide_index=True, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TIMELINE CENTRALIZADA ---
-    st.markdown('<div style="margin-top:15px;" class="section-card">', unsafe_allow_html=True)
+    # --- TIMELINE ---
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
     df_timeline = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     if not df_timeline.empty:
-        fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", 
-                          color="aeronave", template="plotly_dark", height=180)
+        fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", template="plotly_dark", height=180)
         fig.add_vline(x=now_z, line_width=3, line_color="#ff4b4b")
-        fig.update_layout(
-            showlegend=False, margin=dict(l=0, r=0, t=30, b=0),
-            xaxis=dict(side="top", title=None, range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)]),
-            yaxis=dict(title=None), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
-        )
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        fig.update_layout(xaxis=dict(side="top", range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)]),
+                          yaxis=dict(title=None), showlegend=False, margin=dict(l=0, r=0, t=30, b=0),
+                          paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)')
+        st.plotly_chart(fig, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- TABELA FINAL ---
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<p style="color:#00ff7f; font-weight:bold;">📋 LISTADO GENERAL DE MEDIOS AÉREOS</p>', unsafe_allow_html=True)
+    search_query = st.text_input("🔍 Filtro de Busca (Aeronave/Missão):", "")
+    df_final = df[df['LAYER'] == "Meios Aéreos"].copy()
+    if search_query:
+        df_final = df_final[df_final['aeronave'].str.contains(search_query, case=False, na=False) | 
+                            df_final['missao'].str.contains(search_query, case=False, na=False)]
+    df_display = df_final[['aeronave', 'missao', 'surtidas', 'lat', 'lon']].copy()
+    df_display.columns = ['AERONAVE', 'MISIÓN', 'SALIDAS', 'LAT', 'LON']
+    st.dataframe(df_display, use_container_width=True, hide_index=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
