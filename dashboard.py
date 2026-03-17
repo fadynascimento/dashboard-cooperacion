@@ -70,7 +70,6 @@ df = load_data(URL_PLANILHA)
 # --- LÓGICA DE TEMPO ---
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
-segundos_restantes = 15 - (int(time.time()) % 15)
 
 # --- LÓGICA DE ALERTA ---
 focos_ativos = False
@@ -98,7 +97,7 @@ st.markdown(f"""
     [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"] {{ display: none !important; }}
     .stApp {{ background-color: #001233; }}
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 105px;
+        position: fixed; top: 0; left: 0; width: 100%; height: 95px;
         background: rgba(0, 18, 51, 0.9); z-index: 999;
         display: flex; align-items: center; justify-content: center;
         border-bottom: 2px solid rgba(0, 212, 255, 0.5); backdrop-filter: blur(10px);
@@ -106,10 +105,6 @@ st.markdown(f"""
     .title-text {{
         font-family: 'Arial Black', sans-serif; color: white; letter-spacing: 10px; 
         font-size: 2.2rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 15px #00d4ff;
-    }}
-    .refresh-bar {{
-        color: #00ff7f; font-size: 0.65rem; font-family: monospace;
-        margin-top: 5px; text-transform: uppercase; letter-spacing: 2px;
     }}
     .map-outer-frame {{
         padding: 10px; background: rgba(0, 0, 0, 0.2); border-radius: 20px;
@@ -125,18 +120,17 @@ st.markdown(f"""
         border-radius: 12px; padding: 20px; box-shadow: 0 0 30px rgba(0, 212, 255, 0.15); margin-top: 20px;
     }}
     .fixed-logo {{ position: fixed; top: 5px; right: 25px; z-index: 1001; }}
-    .main-content {{ margin-top: 125px; }}
+    .main-content {{ margin-top: 110px; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER ---
+# --- HEADER (SEM CONTADOR) ---
 st.markdown(f"""
     <div class="fixed-header">
         <div style="position: absolute; left: 20px; text-align: left; border-left: 3px solid #00d4ff; padding-left: 15px;">
             <div style="color:#00d4ff; font-size:0.7rem; font-weight:bold;">HORÁRIO ZULU (UTC)</div>
             <div style="font-size:1.6rem; color:white; font-family:monospace; font-weight:bold;">{now_z.strftime('%H:%M:%S')} Z</div>
             <div style="color:#ffcc00; font-size:0.8rem; font-weight:bold;">Local (P): {now_p.strftime('%H:%M')} P</div>
-            <div class="refresh-bar">Próxima Sincronização em {segundos_restantes}s</div>
         </div>
         <div class="title-text">COOPERACIÓN XI</div>
     </div>
@@ -181,7 +175,6 @@ if df is not None:
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                # AJUSTE DO POPUP: SUPRESSÃO DE RÓTULOS PARA METAR
                 if is_met:
                     popup_text = f"""
                     <div style='font-family: monospace; font-size: 13px; width: 240px; background:#f4f4f4; padding:10px; border-radius:5px; border-left:4px solid #00d4ff;'>
