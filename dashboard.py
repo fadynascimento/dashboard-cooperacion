@@ -45,7 +45,6 @@ def load_data(url):
     try:
         df_raw = pd.read_csv(f"{url}&ts={int(time.time())}")
         df_raw.columns = [c.strip() for c in df_raw.columns]
-        # Identifica a Coluna A (primeira coluna)
         df_raw['COLUNA_A'] = df_raw.iloc[:, 0] 
         df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
@@ -92,17 +91,15 @@ st.markdown('<div class="main-content">', unsafe_allow_html=True)
 if df is not None:
     # --- BLOCO SUPERIOR: MAPA E VECTORES ---
     col1, col2 = st.columns([2.5, 1])
-    
     with col1:
         st.markdown('<div class="section-card card-height-align">', unsafe_allow_html=True)
-        # Toggles de filtro
         f1, f2, f3 = st.columns(3)
         show_met = f1.toggle("☁️ Met", value=True)
         show_foc = f2.toggle("🔥 Focos", value=True)
         show_aero = f3.toggle("✈️ Medios Aéreos", value=True)
         
         m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', zoom_control=True, attribution_control=False)
-        # (Lógica de marcadores do mapa)
+        # (A lógica de marcadores aqui permanece a mesma que você já possui)
         st_folium(m, width="100%", height=360, key="map_main")
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -114,11 +111,10 @@ if df is not None:
         st.dataframe(df_aero[['aeronave', 'missao']].rename(columns={'missao': 'misión'}), hide_index=True, use_container_width=True, height=300)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- LÍNEA DEL TIEMPO (CONTEÚDO DA COLUNA A CENTRALIZADO) ---
+    # --- LÍNEA DEL TIEMPO COM CONTROLES DE ZOOM ---
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.markdown('<p style="color:#00d4ff; font-weight:bold; font-size:1.1rem; margin-bottom:10px;">⏳ LÍNEA DEL TIEMPO</p>', unsafe_allow_html=True)
     
-    # Filtro na coluna G (LAYER) para Meios Aéreos e Reuniões
     filtro = df['LAYER'].str.upper().isin(['MEIOS AÉREOS', 'REUNIÃO', 'REUNIÓN', 'REUNIAO'])
     df_timeline = df[filtro & df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
 
@@ -129,29 +125,51 @@ if df is not None:
             x_end="fim_zulu", 
             y="aeronave", 
             color="aeronave", 
-            text="COLUNA_A", # EXIBE O CONTEÚDO DA CÉLULA A
+            text="COLUNA_A", 
             template="plotly_dark", 
-            height=400
+            height=450 # Aumentado um pouco para acomodar o slider
         )
         
         fig.add_vline(x=now_z, line_width=3, line_color="#ff4b4b")
         
         fig.update_traces(
             textposition='inside', 
-            insidetextanchor='middle', # Centralização absoluta
+            insidetextanchor='middle',
             textfont=dict(size=12, color="white")
         )
 
         fig.update_layout(
             showlegend=False, 
             margin=dict(l=10, r=10, t=50, b=10),
-            xaxis=dict(side="top", title=None, range=[now_z - timedelta(hours=6), now_z + timedelta(hours=6)]),
-            yaxis=dict(title=None), 
+            xaxis=dict(
+                side="top", 
+                title=None, 
+                range=[now_z - timedelta(hours=6), now_z + timedelta(hours=6)],
+                # ADIÇÃO DE CONTROLES DE ZOOM E NAVEGAÇÃO
+                rangeslider=dict(visible=True, thickness=0.05), # Barra inferior de navegação
+                rangeselector=dict(
+                    buttons=list([
+                        dict(count=2, label="2h", step="hour", stepmode="backward"),
+                        dict(count=6, label="6h", step="hour", stepmode="backward"),
+                        dict(count=12, label="12h", step="hour", stepmode="backward"),
+                        dict(step="all", label="Tudo")
+                    ]),
+                    bgcolor="#001e46",
+                    activecolor="#00d4ff",
+                    font=dict(color="white", size=11),
+                    y=1.1 # Posiciona os botões acima do gráfico
+                ),
+                type="date"
+            ),
+            yaxis=dict(title=None, fixedrange=False), # Permite zoom no eixo Y se necessário
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)'
         )
         
-        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+        st.plotly_chart(fig, use_container_width=True, config={
+            'displayModeBar': True, # Habilita a barra de ferramentas do Plotly (zoom, pan, reset)
+            'scrollZoom': True      # Permite zoom com o scroll do mouse
+        })
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- DETALLE DE MISIONES ---
