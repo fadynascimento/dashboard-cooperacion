@@ -71,7 +71,7 @@ def load_data(url):
             df_raw[col] = df_raw[col].astype(str).replace('nan', '')
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
-        df_raw['label_timeline'] = df_raw['aeronave'] + "<br>" + df_raw['missao']
+        
         df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         return df_raw
@@ -93,13 +93,12 @@ if df is not None:
         (~df['status_foco'].str.contains("Extinto|Controlado", case=False, na=False))
     ].empty
 
-# --- ESTILO CSS (INCLUINDO REMOÇÃO DA BARRA DEPLOY) ---
+# --- ESTILO CSS ---
 borda_cor = "rgba(0, 255, 127, 0.4)" if not focos_ativos else "rgba(255, 0, 0, 0.7)"
 animacao = "none" if not focos_ativos else "pulse 1.5s infinite"
 
 st.markdown(f"""
     <style>
-    /* Ocultar Barra de Deploy e Menus padrão */
     .stAppDeployButton {{ display: none !important; }}
     #MainMenu {{ visibility: hidden; }}
     header {{ visibility: hidden; height: 0; }}
@@ -112,9 +111,8 @@ st.markdown(f"""
     p, span, label, div, h1, h2, h3, h4, h5, h6 {{ color: white !important; }}
     .stApp {{ background-color: #001233; }}
     
-    /* Cabeçalho */
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 80px;
+        position: fixed; top: 0; left: 0; width: 100%; height: 90px;
         background: rgba(0, 18, 51, 0.95); z-index: 999;
         display: flex; align-items: center; justify-content: space-between;
         border-bottom: 1px solid rgba(0, 212, 255, 0.3); backdrop-filter: blur(5px);
@@ -122,14 +120,14 @@ st.markdown(f"""
     }}
     .title-text {{
         font-family: 'Arial Black', sans-serif; color: white; letter-spacing: 2px; 
-        font-size: 1.4rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 10px #00d4ff;
+        font-size: 1.5rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 10px #00d4ff;
     }}
-    .time-block {{ text-align: left; border-left: 4px solid #00d4ff; padding-left: 12px; }}
-    .time-label {{ color:#00d4ff; font-size:0.7rem; font-weight:bold; margin:0; }}
-    .time-value {{ font-size:2.2rem; color:white; font-family:monospace; font-weight:bold; margin:0; line-height:0.9;}}
-    .time-local {{ color:#ffcc00; font-size:0.9rem; font-weight:bold; margin:0; }}
+    .time-block {{ text-align: left; border-left: 5px solid #00d4ff; padding-left: 15px; }}
+    /* Relógio principal ampliado */
+    .time-value {{ font-size: 3.5rem; color:white; font-family:monospace; font-weight:bold; margin:0; line-height:0.8;}}
+    .time-local {{ color:#ffcc00; font-size:1rem; font-weight:bold; margin:0; margin-top: 5px; }}
     
-    .main-content {{ margin-top: 85px; }}
+    .main-content {{ margin-top: 100px; }}
     .map-outer-frame {{
         padding: 2px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;
         box-shadow: 0 0 10px {borda_cor}; border: 1px solid {borda_cor};
@@ -147,13 +145,12 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER ---
+# --- HEADER (SEM O TERMO HORA ZULU) ---
 st.markdown(f"""
     <div class="fixed-header">
         <div class="time-block">
-            <p class="time-label">HORA ZULU (UTC)</p>
             <p class="time-value">{now_z.strftime('%H:%M:%S')}Z</p>
-            <p class="time-local">Local (P): {now_p.strftime('%H:%M')}P</p>
+            <p class="time-local">Local: {now_p.strftime('%H:%M')}P</p>
         </div>
         <div class="title-text">COOPERACIÓN XI</div>
         <div style="width: 150px;"></div>
@@ -184,7 +181,6 @@ if df is not None:
         if show_aero: active_layers.append("Meios Aéreos")
         
         df_mapa = df[df['LAYER'].isin(active_layers)]
-        
         m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', zoom_control=False, attribution_control=False)
         
         for _, row in df_mapa.iterrows():
@@ -195,14 +191,12 @@ if df is not None:
                     'Meios Aéreos': ('plane', 'cadetblue')
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
-                
                 lat_mil = format_to_military(row['lat_clean'], is_lat=True)
                 lon_mil = format_to_military(row['lon_clean'], is_lat=False)
-                
                 popup_text = f"<div style='color:black; font-size:11px;'><b>{row['aeronave']}</b><br>{row['missao']}<br>{lat_mil}/{lon_mil}</div>"
                 folium.Marker([row['lat_clean'], row['lon_clean']], popup=folium.Popup(popup_text, max_width=200), icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')).add_to(m)
         
-        st_folium(m, width="100%", height=320, key="map_coi")
+        st_folium(m, width="100%", height=300, key="map_coi")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c2:
@@ -218,25 +212,26 @@ if df is not None:
         st.markdown('</div>', unsafe_allow_html=True)
         if focos_ativos: st.error("🚨 FOCOS ACTIVOS")
 
-    # --- LÍNEA DE TIEMPO ---
+    # --- LÍNEA DE TIEMPO (APENAS COLUNA A NO POLÍGONO) ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:0.8rem; margin:0;">LÍNEA DE TIEMPO (Z)</p>', unsafe_allow_html=True)
     df_timeline = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     if not df_timeline.empty:
-        fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="label_timeline", template="plotly_dark")
+        # 'text' agora é apenas a coluna 'aeronave'
+        fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="aeronave", template="plotly_dark")
         fig.add_vline(x=now_z, line_width=2, line_color="#ff4b4b")
-        fig.update_traces(textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=11))
+        fig.update_traces(textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=12))
         fig.update_layout(
             xaxis_range=[now_z - timedelta(hours=3), now_z + timedelta(hours=7)],
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,212,255,0.02)',
-            showlegend=False, height=250, margin=dict(l=5, r=5, t=5, b=5),
+            showlegend=False, height=280, margin=dict(l=5, r=5, t=5, b=5),
             xaxis=dict(title=None), yaxis=dict(title=None)
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- MANIFIESTO ---
-    st.markdown("<p style='color:#00d4ff; font-size:1rem; margin-top:10px;'>📝 MANIFIESTO DE LA MISIÓN</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#00d4ff; font-size:1rem; margin-top:5px;'>📝 MANIFIESTO DE LA MISIÓN</p>", unsafe_allow_html=True)
     df_display = df[['aeronave', 'missao', 'LAYER', 'status_foco', 'horario_solucao', 'inicio_zulu', 'fim_zulu']].copy()
     df_display.columns = ['VECTOR', 'MISIÓN', 'CAPA', 'ESTADO', 'HORA SOLUCIÓN', 'INICIO (Z)', 'FIN (Z)']
     st.dataframe(df_display, use_container_width=True, hide_index=True, height=150)
