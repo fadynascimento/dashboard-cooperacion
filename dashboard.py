@@ -45,7 +45,11 @@ def load_data(url):
     try:
         df_raw = pd.read_csv(f"{url}&ts={int(time.time())}")
         df_raw.columns = [c.strip() for c in df_raw.columns]
-        df_raw['COLUNA_A'] = df_raw.iloc[:, 0] 
+        df_raw['COLUNA_A'] = df_raw.iloc[:, 0]
+        # Mapeamento de colunas H (índice 7) e I (índice 8)
+        df_raw['ALERTA_H'] = df_raw.iloc[:, 7].astype(str).str.lower()
+        df_raw['STATUS_I'] = df_raw.iloc[:, 8].astype(str)
+        
         df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
@@ -57,14 +61,13 @@ df = load_data(URL_PLANILHA)
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
 
-# --- ESTILO CSS ---
+# --- ESTILO CSS COM ANIMAÇÃO DE ALERTA ---
 st.markdown(f"""
     <style>
+    @keyframes blinking {{ 0% {{ opacity: 1; }} 50% {{ opacity: 0.4; }} 100% {{ opacity: 1; }} }}
     .stAppDeployButton {{ display: none !important; }}
     header {{ visibility: hidden; height: 0; }}
-    [data-testid="stHeader"], [data-testid="stToolbar"] {{ display: none !important; }}
     .stApp {{ background-color: #000b1e; color: white; }}
-    .block-container {{ padding: 10px 1.5rem; }}
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; height: 80px;
         background: rgba(0, 11, 30, 0.98); z-index: 999;
@@ -76,8 +79,12 @@ st.markdown(f"""
         background: rgba(0, 30, 70, 0.3); border: 1px solid rgba(0, 212, 255, 0.1);
         border-radius: 8px; padding: 15px; margin-bottom: 15px;
     }}
-    .card-height-align {{ height: 500px; }}
-    [data-testid="stMetricValue"] {{ font-size: 2.8rem !important; color: #00d4ff !important; font-weight: bold; }}
+    .alert-bar {{
+        width: 100%; padding: 5px; border-radius: 5px; text-align: center;
+        font-weight: bold; font-size: 0.9rem; margin-bottom: 10px;
+    }}
+    .alert-red {{ background: rgba(255, 0, 0, 0.2); border: 1px solid red; color: #ff9999; animation: blinking 2s infinite; }}
+    .alert-green {{ background: rgba(0, 255, 127, 0.1); border: 1px solid #00ff7f; color: #00ff7f; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -89,29 +96,58 @@ st.markdown(f'<div class="fixed-header"><div class="time-container"><div class="
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
-    # --- BLOCO SUPERIOR: MAPA E VECTORES ---
+    # Lógica de Alerta (Coluna H e I)
+    has_active_fire = any((df['ALERTA_H'] == 'sim') & (df['STATUS_I'] == 'Ativo'))
+    has_extinguished = any(df['STATUS_I'] == 'Extinto')
+    
     col1, col2 = st.columns([2.5, 1])
+    
     with col1:
-        st.markdown('<div class="section-card card-height-align">', unsafe_allow_html=True)
+        # Barra de Alerta Dinâmica
+        if has_active_fire:
+            st.markdown('<div class="alert-bar alert-red">⚠️ ALERTA: FOCOS DE INCÊNDIO ATIVOS DETECTADOS</div>', unsafe_allow_html=True)
+        elif has_extinguished:
+            st.markdown('<div class="alert-bar alert-green">✅ STATUS: FOCOS EXTINTOS / SOB CONTROLE</div>', unsafe_allow_html=True)
+
+        st.markdown('<div class="section-card" style="height:500px;">', unsafe_allow_html=True)
         f1, f2, f3 = st.columns(3)
-        show_met = f1.toggle("☁️ Met", value=True)
-        show_foc = f2.toggle("🔥 Focos", value=True)
-        show_aero = f3.toggle("✈️ Medios Aéreos", value=True)
+        show_foc = f2.toggle("🔥 Focos Incêndio", value=True)
+        show_aero = f3.toggle("✈️ Meios Aéreos", value=True)
         
-        m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', zoom_control=True, attribution_control=False)
-        # (A lógica de marcadores aqui permanece a mesma que você já possui)
-        st_folium(m, width="100%", height=360, key="map_main")
+        m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', zoom_control=True)
+        
+        # Plotagem no Mapa
+        for _, row in df.iterrows():
+            if row['lat_clean'] and row['lon_clean']:
+                # Se for Meio Aéreo
+                if row['LAYER'] == 'Meios Aéreos' and show_aero:
+                    folium.Marker(
+                        [row['lat_clean'], row['lon_clean']],
+                        popup=f"Aeronave: {row['aeronave']}<br>Missão: {row['missao']}",
+                        icon=folium.Icon(color='blue', icon='plane', prefix='fa')
+                    ).add_to(m)
+                
+                # Se for Foco de Incêndio (Baseado na coluna LAYER ou categoria)
+                elif 'Focos' in str(row['LAYER']) and show_foc:
+                    cor_foco = 'red' if row['STATUS_I'] == 'Ativo' else 'gray'
+                    folium.Marker(
+                        [row['lat_clean'], row['lon_clean']],
+                        popup=f"Foco: {row['STATUS_I']}",
+                        icon=folium.Icon(color=cor_foco, icon='fire', prefix='fa')
+                    ).add_to(m)
+        
+        st_folium(m, width="100%", height=380, key="map_main")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col2:
-        st.markdown('<div class="section-card card-height-align">', unsafe_allow_html=True)
+        st.markdown('<div class="section-card" style="height:550px;">', unsafe_allow_html=True)
         st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:1.2rem;">📊 VECTORES</p>', unsafe_allow_html=True)
-        df_aero = df[df['LAYER']=='Meios Aéreos']
-        st.metric("EN OPERACIÓN", len(df_aero))
-        st.dataframe(df_aero[['aeronave', 'missao']].rename(columns={'missao': 'misión'}), hide_index=True, use_container_width=True, height=300)
+        df_aero_op = df[df['LAYER']=='Meios Aéreos']
+        st.metric("EN OPERACIÓN", len(df_aero_op))
+        st.dataframe(df_aero_op[['aeronave', 'missao']].rename(columns={'missao': 'misión'}), hide_index=True, use_container_width=True, height=350)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- LÍNEA DEL TIEMPO COM CONTROLES DE ZOOM ---
+    # --- LÍNEA DEL TIEMPO ---
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.markdown('<p style="color:#00d4ff; font-weight:bold; font-size:1.1rem; margin-bottom:10px;">⏳ LÍNEA DEL TIEMPO</p>', unsafe_allow_html=True)
     
@@ -119,65 +155,13 @@ if df is not None:
     df_timeline = df[filtro & df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
 
     if not df_timeline.empty:
-        fig = px.timeline(
-            df_timeline, 
-            x_start="inicio_zulu", 
-            x_end="fim_zulu", 
-            y="aeronave", 
-            color="aeronave", 
-            text="COLUNA_A", 
-            template="plotly_dark", 
-            height=450 # Aumentado um pouco para acomodar o slider
-        )
-        
+        fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", 
+                          color="aeronave", text="COLUNA_A", template="plotly_dark", height=400)
         fig.add_vline(x=now_z, line_width=3, line_color="#ff4b4b")
-        
-        fig.update_traces(
-            textposition='inside', 
-            insidetextanchor='middle',
-            textfont=dict(size=12, color="white")
-        )
-
-        fig.update_layout(
-            showlegend=False, 
-            margin=dict(l=10, r=10, t=50, b=10),
-            xaxis=dict(
-                side="top", 
-                title=None, 
-                range=[now_z - timedelta(hours=6), now_z + timedelta(hours=6)],
-                # ADIÇÃO DE CONTROLES DE ZOOM E NAVEGAÇÃO
-                rangeslider=dict(visible=True, thickness=0.05), # Barra inferior de navegação
-                rangeselector=dict(
-                    buttons=list([
-                        dict(count=2, label="2h", step="hour", stepmode="backward"),
-                        dict(count=6, label="6h", step="hour", stepmode="backward"),
-                        dict(count=12, label="12h", step="hour", stepmode="backward"),
-                        dict(step="all", label="Tudo")
-                    ]),
-                    bgcolor="#001e46",
-                    activecolor="#00d4ff",
-                    font=dict(color="white", size=11),
-                    y=1.1 # Posiciona os botões acima do gráfico
-                ),
-                type="date"
-            ),
-            yaxis=dict(title=None, fixedrange=False), # Permite zoom no eixo Y se necessário
-            paper_bgcolor='rgba(0,0,0,0)', 
-            plot_bgcolor='rgba(0,0,0,0)'
-        )
-        
-        st.plotly_chart(fig, use_container_width=True, config={
-            'displayModeBar': True, # Habilita a barra de ferramentas do Plotly (zoom, pan, reset)
-            'scrollZoom': True      # Permite zoom com o scroll do mouse
-        })
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- DETALLE DE MISIONES ---
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<p style="color:#00ff7f; font-weight:bold; font-size:0.9rem;">📋 DETALLE DE MISIONES</p>', unsafe_allow_html=True)
-    df_det = df[['LAYER', 'aeronave', 'missao', 'lat', 'lon']].dropna(subset=['aeronave'])
-    df_det.columns = ['CAPA', 'AERONAVE', 'MISIÓN', 'LAT', 'LON']
-    st.dataframe(df_det, use_container_width=True, hide_index=True)
+        fig.update_traces(textposition='inside', insidetextanchor='middle')
+        fig.update_layout(showlegend=False, xaxis=dict(side="top", range=[now_z - timedelta(hours=6), now_z + timedelta(hours=6)],
+                          rangeslider=dict(visible=True, thickness=0.02)))
+        st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
