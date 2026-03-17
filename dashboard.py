@@ -11,10 +11,10 @@ import re
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURAÇÃO DA PÁGINA ---
-st.set_page_config(layout="wide", page_title="COOPERACIÓN XI", page_icon="✈️")
+st.set_page_config(layout="wide", page_title="COOPERACIÓN XI - COI", page_icon="✈️")
 
 # --- AUTO-REFRESH NATIVO (15 segundos) ---
-st_autorefresh(interval=15000, limit=None, key="map_refresher")
+st_autorefresh(interval=15000, limit=None, key="refresh_dashboard")
 
 # --- FUNÇÕES AUXILIARES ---
 def parse_coordinate(coord):
@@ -39,12 +39,45 @@ def get_base64(bin_file):
     return None
 
 # --- ARQUIVOS E DADOS ---
+# Certifique-se de que sua planilha Google tem a coluna 'LAYER'
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxvtVEGGjxGS316VCXhFUDv7AA9WaPSNql8ncUFu6Kn0d39BPr7XMS6WSSn8JJ6VAVDUAJ9AshQ1bi/pub?output=csv"
 ARQUIVO_BOLACHA = "bolcaha cooperacion.png"
 
-# --- ESTILIZAÇÃO CSS (FOCO NO BRILHO VERDE DO MAPA) ---
+# --- CARREGAMENTO DE DADOS ---
+@st.cache_data(ttl=5)
+def load_data(url):
+    try:
+        df_raw = pd.read_csv(f"{url}&ts={int(time.time())}")
+        df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu']).dt.tz_localize('UTC')
+        df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu']).dt.tz_localize('UTC')
+        df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
+        df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
+        return df_raw
+    except: return None
+
+df = load_data(URL_PLANILHA)
+
+# --- LÓGICA DE TEMPO (GMT-4 - CAMPO GRANDE) ---
+now_z = datetime.now(timezone.utc)
+fuso_papa = timezone(timedelta(hours=-4))
+now_p = datetime.now(fuso_papa)
+
+# --- LÓGICA DE ALERTA DE EMERGÊNCIA ---
+focos_ativos = False
+if df is not None and 'LAYER' in df.columns:
+    focos_ativos = not df[df['LAYER'] == "Focos Incd"].empty
+
+# --- ESTILIZAÇÃO CSS ---
+borda_cor = "rgba(0, 255, 127, 0.4)" if not focos_ativos else "rgba(255, 0, 0, 0.7)"
+animacao = "none" if not focos_ativos else "pulse 1.5s infinite"
+
 st.markdown(f"""
     <style>
+    @keyframes pulse {{
+        0% {{ box-shadow: 0 0 10px rgba(255, 0, 0, 0.4); border-color: rgba(255, 0, 0, 0.4); }}
+        50% {{ box-shadow: 0 0 35px rgba(255, 0, 0, 0.9); border-color: rgba(255, 0, 0, 0.9); }}
+        100% {{ box-shadow: 0 0 10px rgba(255, 0, 0, 0.4); border-color: rgba(255, 0, 0, 0.4); }}
+    }}
     .stAppDeployButton {{ display: none !important; }}
     #MainMenu {{ visibility: hidden; }}
     header {{ visibility: hidden; height: 0; }}
@@ -57,7 +90,7 @@ st.markdown(f"""
         position: fixed; top: 0; left: 0; width: 100%; height: 95px;
         background: rgba(0, 18, 51, 0.85); z-index: 999;
         display: flex; align-items: center; justify-content: center;
-        border-bottom: 2px solid rgba(0, 212, 255, 0.5); backdrop-filter: blur(5px);
+        border-bottom: 2px solid rgba(0, 212, 255, 0.5); backdrop-filter: blur(10px);
     }}
 
     .title-text {{
@@ -65,19 +98,19 @@ st.markdown(f"""
         font-size: 2.2rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 15px #00d4ff;
     }}
 
-    /* MOLDURA DO MAPA COM BRILHO VERDE E PROFUNDIDADE */
-    .map-container {{
-        border-radius: 15px;
-        padding: 5px;
-        background: rgba(0, 255, 127, 0.05);
-        box-shadow: 0 0 25px rgba(0, 255, 127, 0.3), 10px 15px 30px rgba(0, 0, 0, 0.6);
-        border: 1px solid rgba(0, 255, 127, 0.2);
-        margin-bottom: 20px;
+    .map-outer-frame {{
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 20px;
+        box-shadow: 0 0 20px {borda_cor};
+        border: 2px solid {borda_cor};
+        animation: {animacao};
+        margin-bottom: 10px;
     }}
 
     .status-panel {{
         background: rgba(0, 30, 70, 0.3); border-radius: 15px; padding: 15px;
-        box-shadow: -10px 0 20px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 212, 255, 0.05);
+        box-shadow: -10px 0 20px rgba(0, 0, 0, 0.5);
         border: 1px solid rgba(0, 212, 255, 0.1);
     }}
 
@@ -90,10 +123,6 @@ st.markdown(f"""
     .main-content {{ margin-top: 110px; }}
     </style>
     """, unsafe_allow_html=True)
-
-# --- TEMPO (GMT-4 - CAMPO GRANDE) ---
-now_z = datetime.now(timezone.utc)
-now_p = datetime.now(timezone(timedelta(hours=-4)))
 
 # --- HEADER ---
 st.markdown(f"""
@@ -111,66 +140,91 @@ logo_b64 = get_base64(ARQUIVO_BOLACHA)
 if logo_b64:
     st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="180"></div>', unsafe_allow_html=True)
 
-# --- CARGA DE DADOS ---
-@st.cache_data(ttl=5)
-def load_and_clean_data(url):
-    try:
-        df_raw = pd.read_csv(f"{url}&ts={int(time.time())}")
-        df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu']).dt.tz_localize('UTC')
-        df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu']).dt.tz_localize('UTC')
-        df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
-        df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
-        return df_raw
-    except: return None
-
-df = load_and_clean_data(URL_PLANILHA)
-
-# --- DASHBOARD ---
+# --- DASHBOARD MAIN CONTENT ---
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
     c1, c2 = st.columns([2.3, 1])
+    
     with c1:
-        st.markdown("<h4 style='color:#00ff7f; text-shadow: 0 0 10px rgba(0,255,127,0.5);'>📍 CONSCIÊNCIA SITUACIONAL</h4>", unsafe_allow_html=True)
-        # Aplicando a moldura com brilho verde
-        st.markdown('<div class="map-container">', unsafe_allow_html=True)
+        st.markdown("<h4 style='color:#00ff7f;'>📍 CONSCIÊNCIA SITUACIONAL</h4>", unsafe_allow_html=True)
+        
+        # --- MOLDURA DO MAPA ---
+        st.markdown('<div class="map-outer-frame">', unsafe_allow_html=True)
+        
+        # Filtros de Layer (Seleção)
+        lt1, lt2, lt3 = st.columns(3)
+        with lt1: show_met = st.toggle("☁️ Meteorologia", value=True)
+        with lt2: show_foc = st.toggle("🔥 Focos Incd", value=True)
+        with lt3: show_aero = st.toggle("✈️ Meios Aéreos", value=True)
+        
+        # Lógica de Camadas
+        active_layers = []
+        if show_met: active_layers.append("Meteorologia")
+        if show_foc: active_layers.append("Focos Incd")
+        if show_aero: active_layers.append("Meios Aéreos")
+        
+        df_filtered = df[df['LAYER'].isin(active_layers)]
+        
+        # Mapa Folium
         m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', zoom_control=False, attribution_control=False)
-        for _, row in df.iterrows():
+        
+        for _, row in df_filtered.iterrows():
             if row['lat_clean'] is not None and row['lon_clean'] is not None:
-                color = 'red' if 'Foco' in str(row['foco']) else 'blue'
-                folium.Marker([row['lat_clean'], row['lon_clean']], 
-                              popup=f"<b>{row['aeronave']}</b>", icon=folium.Icon(color=color, icon='plane', prefix='fa')).add_to(m)
-        st_folium(m, width="100%", height=380, key="map_v8")
+                icon_map = {'Meteorologia': ('cloud', 'lightgray'), 'Focos Incd': ('fire', 'red'), 'Meios Aéreos': ('plane', 'cadetblue')}
+                icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
+                
+                folium.Marker(
+                    [row['lat_clean'], row['lon_clean']], 
+                    popup=f"<b>{row['aeronave']}</b><br>{row['missao']}", 
+                    icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')
+                ).add_to(m)
+        
+        st_folium(m, width="100%", height=420, key="map_coi_v1")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c2:
         st.markdown('<div class="status-panel">', unsafe_allow_html=True)
         st.markdown("<h4 style='color:#00d4ff; text-align:center;'>📊 STATUS OPERACIONAL</h4>", unsafe_allow_html=True)
+        
+        # Métricas apenas de Meios Aéreos
+        df_ma = df[df['LAYER'] == "Meios Aéreos"]
         sm1, sm2 = st.columns(2)
-        sm1.metric("VETORES", df['aeronave'].nunique())
-        sm2.metric("MISSÕES", len(df))
-        df_status = df.groupby('aeronave').agg({'missao': 'last', 'aeronave': 'size'}).rename(columns={'missao': 'TIPO DE MISSÃO', 'aeronave': 'QTD'}).reset_index()
-        st.dataframe(df_status[['aeronave', 'TIPO DE MISSÃO', 'QTD']], hide_index=True, use_container_width=True)
+        sm1.metric("VETORES", df_ma['aeronave'].nunique())
+        sm2.metric("MISSÕES", len(df_ma))
+        
+        st.write("**Resumo de Esforço Aéreo:**")
+        df_resumo = df_ma.groupby('aeronave').size().reset_index(name='QTD')
+        st.dataframe(df_resumo, hide_index=True, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TIMELINE ---
+        # Pequena legenda de alertas
+        if focos_ativos:
+            st.error("🚨 ALERTA: FOCOS DE INCÊNDIO ATIVOS")
+
+    # --- TIMELINE TÁTICA ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
-    st.markdown(f"""<div style="text-align:center; margin-bottom:10px; background:linear-gradient(90deg, transparent, rgba(0,212,255,0.1), transparent); padding:10px; border-radius:20px;">
-                    <span style="color:#00d4ff; font-size:0.8rem; letter-spacing:2px;">REFERÊNCIA TEMPORAL (Z)</span><br>
-                    <span style="font-size:2rem; color:white; font-family:monospace; font-weight:bold;">{now_z.strftime('%H:%M:%S')}Z</span></div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom:10px;">PROJEÇÃO DE EMPREGO (ZULU)</div>""", unsafe_allow_html=True)
     
-    fig = px.timeline(df, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="missao", template="plotly_dark")
-    fig.add_vline(x=now_z, line_width=3, line_color="#ff4b4b")
-    fig.update_layout(xaxis_range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)], 
-                      paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,212,255,0.02)', 
-                      font_color="white", showlegend=False, height=320, margin=dict(l=10, r=10, t=0, b=10),
-                      modebar_add=['zoomIn2d', 'zoomOut2d', 'pan2d', 'autoScale2d'])
-    st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
+    if not df_ma.empty:
+        fig = px.timeline(df_ma, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="missao", template="plotly_dark")
+        fig.add_vline(x=now_z, line_width=3, line_color="#ff4b4b")
+        fig.update_layout(
+            xaxis_range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)],
+            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,212,255,0.02)',
+            font_color="white", showlegend=False, height=300, margin=dict(l=10, r=10, t=0, b=10),
+            modebar_add=['zoomIn2d', 'zoomOut2d', 'pan2d', 'autoScale2d']
+        )
+        st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': True})
+    else:
+        st.info("Nenhum meio aéreo em operação no momento.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<br><h4 style='color:#00d4ff;'>📝 MANIFESTO</h4>", unsafe_allow_html=True)
-    st.dataframe(df[['aeronave', 'missao', 'foco', 'inicio_zulu', 'fim_zulu']], use_container_width=True, hide_index=True)
+    # --- MANIFESTO FINAL ---
+    st.markdown("<br><h4 style='color:#00d4ff;'>📝 MANIFESTO DE MISSÕES</h4>", unsafe_allow_html=True)
+    st.dataframe(df[['aeronave', 'missao', 'LAYER', 'inicio_zulu', 'fim_zulu']], use_container_width=True, hide_index=True)
 
-else: st.error("⚠️ Falha na sincronização.")
+else:
+    st.warning("🔄 Sincronizando com a base de dados do Google Sheets...")
 
 st.markdown('</div>', unsafe_allow_html=True)
