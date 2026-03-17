@@ -111,23 +111,32 @@ st.markdown(f"""
     .stApp {{ background-color: #001233; }}
     
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 110px;
-        background: rgba(0, 18, 51, 0.95); z-index: 999;
+        position: fixed; top: 0; left: 0; width: 100%; height: 130px;
+        background: rgba(0, 18, 51, 0.98); z-index: 999;
         display: flex; align-items: center; justify-content: space-between;
-        border-bottom: 1px solid rgba(0, 212, 255, 0.3); backdrop-filter: blur(5px);
-        padding: 0 25px;
+        border-bottom: 2px solid rgba(0, 212, 255, 0.5); backdrop-filter: blur(10px);
+        padding: 0 30px;
     }}
     .title-text {{
         font-family: 'Arial Black', sans-serif; color: white; letter-spacing: 2px; 
-        font-size: 1.8rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 12px #00d4ff;
+        font-size: 2rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 15px #00d4ff;
     }}
-    .time-block {{ text-align: left; border-left: 6px solid #00d4ff; padding-left: 15px; margin-top: 5px; }}
+    .time-block {{ text-align: left; margin-top: 0px; }}
     
-    /* Relógio Zulu maximizado */
-    .time-value {{ font-size: 4.5rem; color:white; font-family:monospace; font-weight:bold; margin:0; line-height:0.8; letter-spacing: -2px;}}
-    .time-local {{ color:#ffcc00; font-size:1.1rem; font-weight:bold; margin:0; padding-top: 2px; }}
+    /* RELÓGIO ZULU MASSIVO */
+    .time-value {{ 
+        font-size: 6rem; 
+        color: white; 
+        font-family: 'Courier New', monospace; 
+        font-weight: 900; 
+        margin: 0; 
+        line-height: 1.0; 
+        letter-spacing: -4px;
+        text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+    }}
+    .time-local {{ color: #ffcc00; font-size: 1.2rem; font-weight: bold; margin: 0; padding-top: 0px; }}
     
-    .main-content {{ margin-top: 120px; }}
+    .main-content {{ margin-top: 140px; }}
     .map-outer-frame {{
         padding: 2px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;
         box-shadow: 0 0 10px {borda_cor}; border: 1px solid {borda_cor};
@@ -141,25 +150,25 @@ st.markdown(f"""
         background: rgba(0, 30, 70, 0.4); border: 1px solid rgba(0, 212, 255, 0.3);
         border-radius: 8px; padding: 5px; margin-top: 0px;
     }}
-    .fixed-logo {{ position: fixed; top: 10px; right: 25px; z-index: 1001; }}
+    .fixed-logo {{ position: fixed; top: 15px; right: 30px; z-index: 1001; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER (RELOJ MAXIMIZADO) ---
+# --- HEADER (RELOJ MASSIVO SEM BARRA AZUL) ---
 st.markdown(f"""
     <div class="fixed-header">
         <div class="time-block">
             <p class="time-value">{now_z.strftime('%H:%M:%S')}Z</p>
-            <p class="time-local">Local: {now_p.strftime('%H:%M')}P</p>
+            <p class="time-local">LOCAL: {now_p.strftime('%H:%M')}P</p>
         </div>
         <div class="title-text">COOPERACIÓN XI</div>
-        <div style="width: 200px;"></div>
+        <div style="width: 250px;"></div>
     </div>
     """, unsafe_allow_html=True)
 
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
 if logo_b64:
-    st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="115"></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="130"></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
@@ -167,7 +176,7 @@ if df is not None:
     c1, c2 = st.columns([2.5, 1])
     
     with c1:
-        st.markdown('<p style="color:#00ff7f; font-size: 1rem; margin:0;">📍 CONCIENCIA SITUACIONAL</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#00ff7f; font-size: 1.1rem; margin:0; font-weight:bold;">📍 CONCIENCIA SITUACIONAL</p>', unsafe_allow_html=True)
         st.markdown('<div class="map-outer-frame">', unsafe_allow_html=True)
         
         lt1, lt2, lt3 = st.columns(3)
@@ -196,12 +205,12 @@ if df is not None:
                 popup_text = f"<div style='color:black; font-size:11px;'><b>{row['aeronave']}</b><br>{row['missao']}<br>{lat_mil}/{lon_mil}</div>"
                 folium.Marker([row['lat_clean'], row['lon_clean']], popup=folium.Popup(popup_text, max_width=200), icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')).add_to(m)
         
-        st_folium(m, width="100%", height=280, key="map_coi")
+        st_folium(m, width="100%", height=260, key="map_coi")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c2:
         st.markdown('<div class="status-panel">', unsafe_allow_html=True)
-        st.markdown('<p style="color:#00d4ff; text-align:center; font-size:0.9rem; margin:0;">📊 ESTADO OPERATIVO</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#00d4ff; text-align:center; font-size:1rem; margin:0; font-weight:bold;">📊 ESTADO OPERATIVO</p>', unsafe_allow_html=True)
         df_ma_status = df[df['LAYER'] == "Meios Aéreos"]
         sm1, sm2 = st.columns(2)
         sm1.metric("VECTORES", df_ma_status['aeronave'].nunique() if not df_ma_status.empty else 0)
@@ -212,28 +221,28 @@ if df is not None:
         st.markdown('</div>', unsafe_allow_html=True)
         if focos_ativos: st.error("🚨 FOCOS ACTIVOS")
 
-    # --- LÍNEA DE TIEMPO (COLUNA A) ---
+    # --- LÍNEA DE TIEMPO (SÓ COLUNA A) ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
-    st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:0.8rem; margin:0;">LÍNEA DE TIEMPO (Z)</p>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:0.9rem; margin:0;">LÍNEA DE TIEMPO (Z)</p>', unsafe_allow_html=True)
     df_timeline = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     if not df_timeline.empty:
         fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="aeronave", template="plotly_dark")
         fig.add_vline(x=now_z, line_width=2, line_color="#ff4b4b")
-        fig.update_traces(textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=12))
+        fig.update_traces(textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=13))
         fig.update_layout(
             xaxis_range=[now_z - timedelta(hours=3), now_z + timedelta(hours=7)],
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,212,255,0.02)',
-            showlegend=False, height=280, margin=dict(l=5, r=5, t=5, b=5),
+            showlegend=False, height=260, margin=dict(l=5, r=5, t=5, b=5),
             xaxis=dict(title=None), yaxis=dict(title=None)
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- MANIFIESTO ---
-    st.markdown("<p style='color:#00d4ff; font-size:1rem; margin-top:5px;'>📝 MANIFIESTO DE LA MISIÓN</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color:#00d4ff; font-size:1rem; margin-top:5px; font-weight:bold;'>📝 MANIFIESTO DE LA MISIÓN</p>", unsafe_allow_html=True)
     df_display = df[['aeronave', 'missao', 'LAYER', 'status_foco', 'horario_solucao', 'inicio_zulu', 'fim_zulu']].copy()
     df_display.columns = ['VECTOR', 'MISIÓN', 'CAPA', 'ESTADO', 'HORA SOLUCIÓN', 'INICIO (Z)', 'FIN (Z)']
-    st.dataframe(df_display, use_container_width=True, hide_index=True, height=150)
+    st.dataframe(df_display, use_container_width=True, hide_index=True, height=140)
 
 else:
     st.warning("🔄 Sincronizando...")
