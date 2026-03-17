@@ -71,7 +71,6 @@ def load_data(url):
             df_raw[col] = df_raw[col].astype(str).replace('nan', '')
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
-        
         df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         return df_raw
@@ -112,22 +111,23 @@ st.markdown(f"""
     .stApp {{ background-color: #001233; }}
     
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 90px;
+        position: fixed; top: 0; left: 0; width: 100%; height: 110px;
         background: rgba(0, 18, 51, 0.95); z-index: 999;
         display: flex; align-items: center; justify-content: space-between;
         border-bottom: 1px solid rgba(0, 212, 255, 0.3); backdrop-filter: blur(5px);
-        padding: 0 20px;
+        padding: 0 25px;
     }}
     .title-text {{
         font-family: 'Arial Black', sans-serif; color: white; letter-spacing: 2px; 
-        font-size: 1.5rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 10px #00d4ff;
+        font-size: 1.8rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 12px #00d4ff;
     }}
-    .time-block {{ text-align: left; border-left: 5px solid #00d4ff; padding-left: 15px; }}
-    /* Relógio principal ampliado */
-    .time-value {{ font-size: 3.5rem; color:white; font-family:monospace; font-weight:bold; margin:0; line-height:0.8;}}
-    .time-local {{ color:#ffcc00; font-size:1rem; font-weight:bold; margin:0; margin-top: 5px; }}
+    .time-block {{ text-align: left; border-left: 6px solid #00d4ff; padding-left: 15px; margin-top: 5px; }}
     
-    .main-content {{ margin-top: 100px; }}
+    /* Relógio Zulu maximizado */
+    .time-value {{ font-size: 4.5rem; color:white; font-family:monospace; font-weight:bold; margin:0; line-height:0.8; letter-spacing: -2px;}}
+    .time-local {{ color:#ffcc00; font-size:1.1rem; font-weight:bold; margin:0; padding-top: 2px; }}
+    
+    .main-content {{ margin-top: 120px; }}
     .map-outer-frame {{
         padding: 2px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;
         box-shadow: 0 0 10px {borda_cor}; border: 1px solid {borda_cor};
@@ -141,11 +141,11 @@ st.markdown(f"""
         background: rgba(0, 30, 70, 0.4); border: 1px solid rgba(0, 212, 255, 0.3);
         border-radius: 8px; padding: 5px; margin-top: 0px;
     }}
-    .fixed-logo {{ position: fixed; top: 5px; right: 20px; z-index: 1001; }}
+    .fixed-logo {{ position: fixed; top: 10px; right: 25px; z-index: 1001; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER (SEM O TERMO HORA ZULU) ---
+# --- HEADER (RELOJ MAXIMIZADO) ---
 st.markdown(f"""
     <div class="fixed-header">
         <div class="time-block">
@@ -153,13 +153,13 @@ st.markdown(f"""
             <p class="time-local">Local: {now_p.strftime('%H:%M')}P</p>
         </div>
         <div class="title-text">COOPERACIÓN XI</div>
-        <div style="width: 150px;"></div>
+        <div style="width: 200px;"></div>
     </div>
     """, unsafe_allow_html=True)
 
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
 if logo_b64:
-    st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="110"></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="115"></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
@@ -196,7 +196,7 @@ if df is not None:
                 popup_text = f"<div style='color:black; font-size:11px;'><b>{row['aeronave']}</b><br>{row['missao']}<br>{lat_mil}/{lon_mil}</div>"
                 folium.Marker([row['lat_clean'], row['lon_clean']], popup=folium.Popup(popup_text, max_width=200), icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')).add_to(m)
         
-        st_folium(m, width="100%", height=300, key="map_coi")
+        st_folium(m, width="100%", height=280, key="map_coi")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c2:
@@ -208,16 +208,15 @@ if df is not None:
         sm2.metric("MISIONES", len(df_ma_status) if not df_ma_status.empty else 0)
         if not df_ma_status.empty:
             df_resumo = df_ma_status.groupby(['aeronave', 'missao']).size().reset_index(name='CANT')
-            st.dataframe(df_resumo, hide_index=True, use_container_width=True, height=130)
+            st.dataframe(df_resumo, hide_index=True, use_container_width=True, height=120)
         st.markdown('</div>', unsafe_allow_html=True)
         if focos_ativos: st.error("🚨 FOCOS ACTIVOS")
 
-    # --- LÍNEA DE TIEMPO (APENAS COLUNA A NO POLÍGONO) ---
+    # --- LÍNEA DE TIEMPO (COLUNA A) ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:0.8rem; margin:0;">LÍNEA DE TIEMPO (Z)</p>', unsafe_allow_html=True)
     df_timeline = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     if not df_timeline.empty:
-        # 'text' agora é apenas a coluna 'aeronave'
         fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="aeronave", template="plotly_dark")
         fig.add_vline(x=now_z, line_width=2, line_color="#ff4b4b")
         fig.update_traces(textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=12))
