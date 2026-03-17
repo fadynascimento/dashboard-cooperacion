@@ -1,146 +1,158 @@
 import streamlit as st
-import streamlit.components.v1 as components
+import pandas as pd
+import folium
+from streamlit_folium import st_folium
+import plotly.express as px
+from datetime import datetime, timezone, timedelta
+import os
+import base64
+import time
+import re
+from streamlit_autorefresh import st_autorefresh
 
-# Configuração da página para ocupar a tela toda
-st.set_page_config(layout="wide", page_title="Dashboard Cooperación XI")
+# --- CONFIGURAÇÃO DE PÁGINA ---
+st.set_page_config(layout="wide", page_title="COOPERACIÓN XI - COI", page_icon="✈️")
 
-# O código HTML/CSS completo que montamos
-html_code = """
-<!DOCTYPE html>
-<html lang="pt-br">
-<head>
-    <meta charset="UTF-8">
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+# Auto-refresh 30s
+st_autorefresh(interval=30000, limit=None, key="refresh_dashboard")
+
+# --- FUNÇÕES AUXILIARES ---
+def parse_coordinate(coord):
+    if pd.isna(coord) or str(coord).strip() == "": return None
+    c = str(coord).strip().upper().replace(',', '.')
+    parts = re.findall(r"[-+]?\d*\.\d+|\d+", c)
+    if not parts: return None
+    try:
+        if len(parts) == 1: val = float(parts[0])
+        elif len(parts) == 2: val = float(parts[0]) + (float(parts[1]) / 60)
+        else: val = float(parts[0]) + (float(parts[1]) / 60) + (float(parts[2]) / 3600)
+        if 'S' in c or 'W' in c: val = -abs(val)
+        return val
+    except: return None
+
+def get_base64(bin_file):
+    if os.path.exists(bin_file):
+        with open(bin_file, 'rb') as f:
+            return base64.b64encode(f.read()).decode()
+    return None
+
+# --- CARGA DE DADOS ---
+URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxvtVEGGjxGS316VCXhFUDv7AA9WaPSNql8ncUFu6Kn0d39BPr7XMS6WSSn8JJ6VAVDUAJ9AshQ1bi/pub?output=csv"
+ARQUIVO_BOLACHA = "bolcaha cooperacion.png"
+
+@st.cache_data(ttl=5)
+def load_data(url):
+    try:
+        df_raw = pd.read_csv(f"{url}&ts={int(time.time())}")
+        df_raw.columns = [c.strip() for c in df_raw.columns]
+        df_raw['label_timeline'] = df_raw.iloc[:, 0].astype(str)
+        df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
+        df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
+        df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
+        df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
+        if 'surtidas' not in df_raw.columns: df_raw['surtidas'] = 1
+        return df_raw
+    except: return None
+
+df = load_data(URL_PLANILHA)
+now_z = datetime.now(timezone.utc)
+now_p = datetime.now(timezone(timedelta(hours=-4)))
+
+# --- CSS AVANÇADO: LIMPEZA E ALINHAMENTO ---
+st.markdown(f"""
     <style>
-        :root {
-            --bg-color: #000c1d;
-            --panel-bg: #00162d;
-            --accent-blue: #00f2ff;
-            --accent-yellow: #ffcc00;
-            --border-color: #004a7c;
-        }
-        body {
-            background-color: var(--bg-color);
-            color: white;
-            font-family: 'Segoe UI', sans-serif;
-            margin: 0;
-            padding: 10px;
-            overflow: hidden;
-        }
-        .header {
-            display: flex;
-            align-items: baseline;
-            border-bottom: 2px solid var(--border-color);
-            padding-bottom: 5px;
-            margin-bottom: 15px;
-        }
-        .zulu-time { font-size: 38px; font-weight: bold; font-family: monospace; margin-right: 20px; }
-        .local-time { color: var(--accent-yellow); font-weight: bold; margin-right: auto; }
-        .title { font-size: 28px; font-weight: bold; text-transform: uppercase; text-shadow: 0 0 10px var(--accent-blue); }
-        
-        /* Timeline */
-        .timeline-container {
-            background: rgba(0, 22, 45, 0.8);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 40px 20px 15px 20px;
-            position: relative;
-            margin-bottom: 20px;
-        }
-        .time-markers {
-            display: flex;
-            justify-content: space-between;
-            position: absolute;
-            top: 10px; left: 20px; right: 20px;
-            color: var(--accent-yellow);
-            font-size: 11px;
-            font-weight: bold;
-            border-bottom: 1px solid rgba(255, 204, 0, 0.2);
-        }
-        .timeline-track {
-            height: 40px;
-            background: rgba(255, 255, 255, 0.05);
-            position: relative;
-            display: flex;
-            align-items: center;
-        }
-        .mission-polygon {
-            position: absolute;
-            height: 30px;
-            background: linear-gradient(90deg, #004a7c, var(--accent-blue));
-            clip-path: polygon(3% 0%, 97% 0%, 100% 50%, 97% 100%, 3% 100%, 0% 50%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        .polygon-text { color: white; font-weight: bold; font-size: 11px; text-transform: uppercase; }
-
-        /* Mapa e Tabela */
-        .main-layout { display: flex; gap: 15px; height: 450px; }
-        #map { flex: 2.5; border: 1px solid var(--border-color); border-radius: 8px; }
-        .leaflet-control-attribution { display: none !important; }
-        
-        .side-panel {
-            flex: 1;
-            background-color: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            padding: 15px;
-        }
-        .panel-header { color: var(--accent-blue); font-weight: bold; text-transform: uppercase; margin-bottom: 10px; font-size: 13px; }
-        table { width: 100%; border-collapse: collapse; }
-        th { text-align: left; color: #8899aa; font-size: 10px; padding: 8px; border-bottom: 1px solid var(--border-color); }
-        td { padding: 10px 8px; font-size: 12px; border-bottom: 1px solid #002244; }
+    .stApp {{ background-color: #000b1e; color: white; }}
+    [data-testid="stHeader"] {{ display: none; }}
+    
+    /* Remove polígonos azuis e bordas fantasmas */
+    [data-testid="stVerticalBlock"], [data-testid="column"] {{
+        border: none !important; outline: none !important; box-shadow: none !important;
+    }}
+    
+    /* Remove marcas do mapa */
+    .leaflet-control-attribution, .leaflet-control-zoom {{ display: none !important; }}
+    
+    .fixed-header {{
+        position: fixed; top: 0; left: 0; width: 100%; height: 110px;
+        background: #000b1e; z-index: 1000;
+        display: flex; align-items: center; justify-content: space-between;
+        padding: 0 40px; border-bottom: 2px solid #00d4ff;
+    }}
+    
+    .main-content {{ margin-top: 130px; }}
+    
+    .section-card {{
+        background: rgba(0, 30, 70, 0.4); border: 1px solid rgba(0, 212, 255, 0.1);
+        border-radius: 4px; padding: 15px; margin-bottom: 15px;
+    }}
+    
+    /* Forçar tabela lado a lado sem quebra */
+    .stHorizontalBlock {{ gap: 1rem !important; }}
     </style>
-</head>
-<body>
-    <div class="header">
-        <div class="zulu-time" id="zulu-clock">00:00:00Z</div>
-        <div class="local-time">LOCAL: 13:19P</div>
-        <div class="title">Cooperación XI</div>
-    </div>
+    """, unsafe_allow_html=True)
 
-    <div class="timeline-container">
-        <div class="time-markers">
-            <span>08:00</span><span>10:00</span><span>12:00</span><span>14:00</span><span>16:00</span><span>18:00</span><span>20:00</span>
+# --- HEADER ---
+logo_b64 = get_base64(ARQUIVO_BOLACHA)
+logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="110">' if logo_b64 else ""
+
+st.markdown(f"""
+    <div class="fixed-header">
+        <div style="min-width: 250px;">
+            <div style="font-size: 2.5rem; font-weight: bold; color: white;">{now_z.strftime('%H:%M:%S')}Z</div>
+            <div style="font-size: 1.1rem; color: #ffcc00; font-weight: bold;">LOCAL: {now_p.strftime('%H:%M')}P</div>
         </div>
-        <div class="timeline-track">
-            <div class="mission-polygon" style="left: 15%; width: 25%;"><span class="polygon-text">FAB 1400</span></div>
-            <div class="mission-polygon" style="left: 50%; width: 20%; background: linear-gradient(90deg, #7c3a00, #ffcc00);"><span class="polygon-text">FAB 2852</span></div>
-        </div>
+        <div style="font-family: 'Arial Black'; font-size: 2.8rem; letter-spacing: 4px; color: white; text-shadow: 0 0 15px #00d4ff;">COOPERACIÓN XI</div>
+        <div style="min-width: 250px; text-align: right;">{logo_html}</div>
     </div>
+    """, unsafe_allow_html=True)
 
-    <div class="main-layout">
-        <div id="map"></div>
-        <div class="side-panel">
-            <div class="panel-header">📊 Vectores em Operação</div>
-            <table>
-                <thead><tr><th>Aeronave</th><th>Misión</th><th>QTDE</th></tr></thead>
-                <tbody>
-                    <tr><td>FAB 1400</td><td>KC390</td><td>1</td></tr>
-                    <tr><td>FAB 2852</td><td>C-105 SAR</td><td>1</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
+st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script>
-        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([-20.46, -54.61], 6);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png').addTo(map);
-        
-        function updateClock() {
-            const now = new Date();
-            const h = String(now.getUTCHours()).padStart(2, '0');
-            const m = String(now.getUTCMinutes()).padStart(2, '0');
-            const s = String(now.getUTCSeconds()).padStart(2, '0');
-            document.getElementById('zulu-clock').textContent = h + ':' + m + ':' + s + 'Z';
-        }
-        setInterval(updateClock, 1000); updateClock();
-    </script>
-</body>
-</html>
-"""
+if df is not None:
+    # --- 1. DASHBOARD TÁTICO: MAPA E RESUMO ---
+    col_map, col_stat = st.columns([1.6, 1])
+    
+    with col_map:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', zoom_control=False)
+        for _, row in df.dropna(subset=['lat_clean', 'lon_clean']).iterrows():
+            c = 'cadetblue' if 'Meios' in row['LAYER'] else 'red'
+            folium.Marker([row['lat_clean'], row['lon_clean']], 
+                          icon=folium.Icon(color=c, icon='plane', prefix='fa')).add_to(m)
+        st_folium(m, width="100%", height=380, key="mapa_coi")
+        st.markdown('</div>', unsafe_allow_html=True)
 
-# Renderiza o componente no Streamlit
-components.html(html_code, height=800, scrolling=True)
+    with col_stat:
+        st.markdown('<div class="section-card" style="height: 405px;">', unsafe_allow_html=True)
+        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold;">📊 VECTORES EM OPERAÇÃO</p>', unsafe_allow_html=True)
+        df_v = df[df['LAYER'] == "Meios Aéreos"].groupby(['aeronave', 'missao'])['surtidas'].sum().reset_index()
+        st.table(df_v)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- 2. TIMELINE ---
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    df_t = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
+    if not df_t.empty:
+        fig = px.timeline(df_t, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", 
+                          text="label_timeline", color="aeronave", template="plotly_dark")
+        fig.add_vline(x=now_z, line_width=3, line_color="red")
+        fig.update_layout(height=250, margin=dict(l=0, r=0, t=30, b=0), showlegend=False)
+        st.plotly_chart(fig, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # --- 3. CAMPO DE BUSCA E TABELA DETALHADA (FINAL DA PÁGINA) ---
+    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<p style="color:#00d4ff; font-weight:bold;">🔍 BUSCA RÁPIDA DE MISSÕES</p>', unsafe_allow_html=True)
+    busca = st.text_input("Filtrar por aeronave, missão ou localidade:", placeholder="Ex: C-105 ou Campo Grande")
+    
+    if busca:
+        df_filtered = df[df.apply(lambda row: busca.lower() in row.astype(str).str.lower().values, axis=1)]
+    else:
+        df_filtered = df
+
+    # Tabela final completa
+    st.dataframe(df_filtered.drop(columns=['lat_clean', 'lon_clean', 'label_timeline'], errors='ignore'), 
+                 use_container_width=True, hide_index=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
