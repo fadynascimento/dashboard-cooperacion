@@ -10,13 +10,13 @@ import time
 import re
 from streamlit_autorefresh import st_autorefresh
 
-# --- CONFIGURAÇÃO DA PÁGINA ---
+# --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(layout="wide", page_title="COOPERACIÓN XI - COI", page_icon="✈️")
 
-# --- AUTO-REFRESH NATIVO (15 segundos) ---
+# --- AUTO-REFRESH (15 segundos) ---
 st_autorefresh(interval=15000, limit=None, key="refresh_dashboard")
 
-# --- FUNÇÕES AUXILIARES DE COORDENADAS ---
+# --- FUNCIONES AUXILIARES ---
 def parse_coordinate(coord):
     if pd.isna(coord) or str(coord).strip() == "": return None
     c = str(coord).strip().upper().replace(',', '.')
@@ -38,12 +38,10 @@ def format_to_military(decimal_coord, is_lat=True):
     degrees = int(abs_val)
     minutes = int((abs_val - degrees) * 60)
     seconds = int((abs_val - degrees - minutes/60) * 3600)
-    
     if is_lat:
         designator = "S" if decimal_coord < 0 else "N"
     else:
         designator = "W" if decimal_coord < 0 else "E"
-        
     return f"{degrees:02d}°{minutes:02d}'{seconds:02d}\"{designator}"
 
 def get_base64(bin_file):
@@ -52,7 +50,7 @@ def get_base64(bin_file):
             return base64.b64encode(f.read()).decode()
     return None
 
-# --- CARREGAMENTO DE DADOS ---
+# --- CARGA DE DATOS ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxvtVEGGjxGS316VCXhFUDv7AA9WaPSNql8ncUFu6Kn0d39BPr7XMS6WSSn8JJ6VAVDUAJ9AshQ1bi/pub?output=csv"
 ARQUIVO_BOLACHA = "bolcaha cooperacion.png"
 
@@ -61,22 +59,20 @@ def load_data(url):
     try:
         df_raw = pd.read_csv(f"{url}&ts={int(time.time())}")
         df_raw.columns = [c.strip() for c in df_raw.columns]
-        
         required_cols = ['LAYER', 'inicio_zulu', 'fim_zulu', 'lat', 'lon', 'aeronave', 'missao', 'status_foco', 'horario_solucao']
         for col in required_cols:
             if col not in df_raw.columns:
                 df_raw[col] = ""
-        
         df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         return df_raw
     except Exception as e:
-        st.error(f"Erro ao processar planilha: {e}")
+        st.error(f"Error al procesar la planilla: {e}")
         return None
 
 df = load_data(URL_PLANILHA)
 
-# --- LÓGICA DE TEMPO ---
+# --- LÓGICA DE TIEMPO ---
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
 
@@ -88,7 +84,7 @@ if df is not None:
         (~df['status_foco'].astype(str).str.contains("Extinto|Controlado", case=False, na=False))
     ].empty
 
-# --- ESTILIZAÇÃO CSS ---
+# --- ESTILO CSS ---
 borda_cor = "rgba(0, 255, 127, 0.4)" if not focos_ativos else "rgba(255, 0, 0, 0.7)"
 animacao = "none" if not focos_ativos else "pulse 1.5s infinite"
 
@@ -137,7 +133,7 @@ st.markdown(f"""
 st.markdown(f"""
     <div class="fixed-header">
         <div style="position: absolute; left: 20px; text-align: left; border-left: 3px solid #00d4ff; padding-left: 15px;">
-            <div style="color:#00d4ff; font-size:0.7rem; font-weight:bold;">HORÁRIO ZULU (UTC)</div>
+            <div style="color:#00d4ff; font-size:0.7rem; font-weight:bold;">HORA ZULU (UTC)</div>
             <div style="font-size:1.6rem; color:white; font-family:monospace; font-weight:bold;">{now_z.strftime('%H:%M:%S')} Z</div>
             <div style="color:#ffcc00; font-size:0.8rem; font-weight:bold;">Local (P): {now_p.strftime('%H:%M')} P</div>
         </div>
@@ -159,9 +155,10 @@ if df is not None:
         st.markdown('<div class="map-outer-frame">', unsafe_allow_html=True)
         
         lt1, lt2, lt3 = st.columns(3)
-        with lt1: show_met = st.toggle("☁️ Meteorología", value=True)
-        with lt2: show_foc = st.toggle("🔥 Focos Incd", value=True)
-        with lt3: show_aero = st.toggle("✈️ Medios aereos", value=True)
+        # Etiquetas visuales en español, pero filtrando las capas originales
+        show_met = lt1.toggle("☁️ Meteorología", value=True)
+        show_foc = lt2.toggle("🔥 Focos Incd", value=True)
+        show_aero = lt3.toggle("✈️ Medios aéreos", value=True)
         
         active_layers = []
         if show_met: active_layers.append("Meteorologia")
@@ -192,12 +189,7 @@ if df is not None:
                     <span style='color:#222; font-size:12px; font-weight:bold; font-family:monospace;'>{lat_mil} / {lon_mil}</span>
                 </div>
                 """
-                
-                folium.Marker(
-                    [row['lat_clean'], row['lon_clean']], 
-                    popup=folium.Popup(popup_text, max_width=300), 
-                    icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')
-                ).add_to(m)
+                folium.Marker([row['lat_clean'], row['lon_clean']], popup=folium.Popup(popup_text, max_width=300), icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')).add_to(m)
         
         st_folium(m, width="100%", height=420, key="map_coi_vFinal")
         st.markdown('</div>', unsafe_allow_html=True)
@@ -211,13 +203,13 @@ if df is not None:
         sm2.metric("MISIONES", len(df_ma) if not df_ma.empty else 0)
         
         if not df_ma.empty:
-            df_resumo = df_ma.groupby(['aeronave', 'missao']).size().reset_index(name='QTD')
-            df_resumo.columns = ['AERONAVE', 'TIPO DE MISIÓN', 'QTD']
+            df_resumo = df_ma.groupby(['aeronave', 'missao']).size().reset_index(name='CANT')
+            df_resumo.columns = ['VECTOR', 'TIPO DE MISIÓN', 'CANT']
             st.dataframe(df_resumo, hide_index=True, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
         if focos_ativos:
-            st.error("🚨 FOCOS DE INCÊNDIO ATIVOS")
+            st.error("🚨 FOCOS DE INCENDIO ACTIVOS")
 
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
     st.markdown(f"""<div style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom:10px;">LÍNEA DE TIEMPO (Z)</div>""", unsafe_allow_html=True)
@@ -230,7 +222,12 @@ if df is not None:
     st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("<br><h4 style='color:#00d4ff;'>📝 MANIFIESTO DE LA MISIÓN</h4>", unsafe_allow_html=True)
-    st.dataframe(df[['aeronave', 'missao', 'LAYER', 'status_foco', 'horario_solucao', 'inicio_zulu', 'fim_zulu']], use_container_width=True, hide_index=True)
+    
+    # Renombrando columnas para la visualización final del manifiesto
+    if df is not None:
+        df_display = df[['aeronave', 'missao', 'LAYER', 'status_foco', 'horario_solucao', 'inicio_zulu', 'fim_zulu']].copy()
+        df_display.columns = ['VECTOR', 'MISIÓN', 'CAPA', 'ESTADO', 'HORA SOLUCIÓN', 'INICIO (Z)', 'FIN (Z)']
+        st.dataframe(df_display, use_container_width=True, hide_index=True)
 
 else:
     st.warning("🔄 Sincronizando...")
