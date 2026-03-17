@@ -56,7 +56,7 @@ df = load_data(URL_PLANILHA)
 now_z = datetime.now(timezone.utc)
 now_l = now_z - timedelta(hours=4) # Fuso Campo Grande / MS
 
-# --- CSS PERSONALIZADO (IDENTIDADE VISUAL COOPERACIÓN XI) ---
+# --- CSS PERSONALIZADO ---
 st.markdown(f"""
     <style>
     @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
@@ -81,8 +81,7 @@ st.markdown(f"""
 
     .section-card {{
         background: rgba(0, 30, 70, 0.4); 
-        border-left: 4px solid #00d4ff;
-        border-radius: 4px; padding: 20px; 
+        border-radius: 4px; padding: 15px; 
         box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
         margin-bottom: 20px;
     }}
@@ -91,12 +90,21 @@ st.markdown(f"""
         background: rgba(0, 40, 85, 0.6);
         border: 1px solid #00d4ff;
         box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
-        padding: 15px; border-radius: 8px;
+        padding: 12px; border-radius: 8px;
     }}
 
-    h1, h2, h3 {{ font-family: 'Orbitron', sans-serif !important; color: #00d4ff !important; }}
+    /* Ajuste de tamanho das métricas para economizar espaço */
+    [data-testid="stMetricValue"] {{
+        font-size: 1.5rem !important;
+        font-family: 'Orbitron', sans-serif;
+    }}
+    [data-testid="stMetricLabel"] {{
+        font-size: 0.8rem !important;
+        letter-spacing: 1px;
+    }}
+
+    h1, h2, h3, h4 {{ font-family: 'Orbitron', sans-serif !important; color: #00d4ff !important; margin-bottom: 5px !important; }}
     
-    /* Customização de Tabelas */
     .stDataFrame, .stTable {{ background: transparent !important; }}
     </style>
     """, unsafe_allow_html=True)
@@ -125,32 +133,14 @@ st.markdown(f"""
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
-    # --- COLUNA SUPERIOR: STATUS E MAPA ---
-    col_stat, col_map = st.columns([1, 2.3])
-
-    with col_stat:
-        st.markdown('<div class="status-panel">', unsafe_allow_html=True)
-        st.subheader("📊 STATUS OPERACIONAL")
-        
-        # Métricas Rápidas
-        m1, m2 = st.columns(2)
-        total_vetores = df['aeronave'].nunique()
-        m1.metric("VETORES", total_vetores)
-        m2.metric("MISSÕES", len(df))
-        
-        st.markdown("---")
-        # Tabela Consolidada de Meios
-        df_resumo = df.groupby(['aeronave', 'missao']).size().reset_index(name='QTD')
-        st.dataframe(df_resumo, use_container_width=True, hide_index=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    # --- COLUNA SUPERIOR: MAPA (ESQUERDA) E STATUS (DIREITA) ---
+    col_map, col_stat = st.columns([2.3, 1])
 
     with col_map:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        # Mapa com tiles limpos para foco operacional
+        st.markdown('<div class="section-card" style="border-left: 4px solid #00d4ff;">', unsafe_allow_html=True)
         m = folium.Map(location=[-19.5, -57.0], zoom_start=6, tiles='cartodbpositron', zoom_control=False)
         
         for _, row in df.dropna(subset=['lat_clean', 'lon_clean']).iterrows():
-            # Diferenciação de cor: Foco de Incêndio (Vermelho) vs Meios (Azul)
             is_fire = 'FOGO' in str(row.get('missao', '')).upper() or 'INCENDIO' in str(row.get('missao', '')).upper()
             color = 'red' if is_fire else 'blue'
             
@@ -163,8 +153,25 @@ if df is not None:
         st_folium(m, width="100%", height=400, key="mapa_operacional")
         st.markdown('</div>', unsafe_allow_html=True)
 
+    with col_stat:
+        st.markdown('<div class="status-panel">', unsafe_allow_html=True)
+        st.markdown('<h4 style="font-size: 0.9rem; text-align: center;">📊 STATUS OPERACIONAL</h4>', unsafe_allow_html=True)
+        
+        # Métricas Compactas
+        m1, m2 = st.columns(2)
+        total_vetores = df['aeronave'].nunique()
+        m1.metric("VETORES", total_vetores)
+        m2.metric("MISSÕES", len(df))
+        
+        st.markdown('<div style="margin: 10px 0; border-top: 1px solid rgba(0,212,255,0.3);"></div>', unsafe_allow_html=True)
+        
+        # Tabela de Meios
+        df_resumo = df.groupby(['aeronave', 'missao']).size().reset_index(name='QTD')
+        st.dataframe(df_resumo, use_container_width=True, hide_index=True, height=265)
+        st.markdown('</div>', unsafe_allow_html=True)
+
     # --- TIMELINE CENTRALIZADA (T-4h até T+4h) ---
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-card" style="border-left: 4px solid #ffcc00;">', unsafe_allow_html=True)
     st.subheader("🕒 LINHA DO TEMPO (ZULU)")
     
     df_t = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
@@ -174,13 +181,10 @@ if df is not None:
             color="aeronave", text="missao", template="plotly_dark",
             color_discrete_sequence=px.colors.qualitative.Pastel
         )
-        
-        # Centralização rigorosa no Tempo Zulu Atual
-        t_min = now_z - timedelta(hours=4)
-        t_max = now_z + timedelta(hours=4)
+        t_min, t_max = now_z - timedelta(hours=4), now_z + timedelta(hours=4)
         
         fig.update_layout(
-            height=320,
+            height=300,
             xaxis_range=[t_min, t_max],
             margin=dict(l=10, r=10, t=10, b=10),
             showlegend=False,
@@ -188,31 +192,14 @@ if df is not None:
             paper_bgcolor='rgba(0,0,0,0)',
             plot_bgcolor='rgba(0,0,0,0)'
         )
-        # Linha indicadora de tempo real (T)
         fig.add_vline(x=now_z, line_width=3, line_dash="dash", line_color="#00d4ff")
-        
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
-    else:
-        st.info("Aguardando dados de cronograma para gerar Timeline.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- BUSCA E DETALHAMENTO ---
     with st.expander("🔍 CONSULTAR RECURSOS E COORDENADAS"):
         busca = st.text_input("Filtrar por aeronave, missão ou localidade:", placeholder="Ex: C-105")
-        if busca:
-            df_view = df[df.apply(lambda row: busca.lower() in row.astype(str).str.lower().values, axis=1)]
-        else:
-            df_view = df
-        
+        df_view = df[df.apply(lambda row: busca.lower() in row.astype(str).str.lower().values, axis=1)] if busca else df
         st.dataframe(df_view.drop(columns=['lat_clean', 'lon_clean'], errors='ignore'), use_container_width=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
-
-# Script para Auto-Refresh forçado via JS (Redundância)
-st.components.v1.html("""
-<script>
-    setTimeout(function(){
-        window.location.reload();
-    }, 15000);
-</script>
-""", height=0)
