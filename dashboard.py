@@ -38,7 +38,7 @@ def get_base64(bin_file):
             return base64.b64encode(f.read()).decode()
     return None
 
-# --- CARREGAMENTO DE DADOS (BLINDADO) ---
+# --- CARREGAMENTO DE DADOS ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxvtVEGGjxGS316VCXhFUDv7AA9WaPSNql8ncUFu6Kn0d39BPr7XMS6WSSn8JJ6VAVDUAJ9AshQ1bi/pub?output=csv"
 ARQUIVO_BOLACHA = "bolcaha cooperacion.png"
 
@@ -70,8 +70,6 @@ df = load_data(URL_PLANILHA)
 # --- LÓGICA DE TEMPO ---
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
-
-# Lógica do Contador (baseado no ciclo de 15s)
 segundos_restantes = 15 - (int(time.time()) % 15)
 
 # --- LÓGICA DE ALERTA ---
@@ -99,7 +97,6 @@ st.markdown(f"""
     footer {{ visibility: hidden; }}
     [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"] {{ display: none !important; }}
     .stApp {{ background-color: #001233; }}
-    
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; height: 105px;
         background: rgba(0, 18, 51, 0.9); z-index: 999;
@@ -132,7 +129,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER COM CONTADOR ---
+# --- HEADER ---
 st.markdown(f"""
     <div class="fixed-header">
         <div style="position: absolute; left: 20px; text-align: left; border-left: 3px solid #00d4ff; padding-left: 15px;">
@@ -174,7 +171,9 @@ if df is not None:
         
         for _, row in df_filtered.iterrows():
             if row['lat_clean'] is not None and row['lon_clean'] is not None:
+                is_met = "meteorologia" in str(row['LAYER']).lower()
                 fogo_extinto = "extinto" in str(row['status_foco']).lower() or "controlado" in str(row['status_foco']).lower()
+                
                 icon_map = {
                     'Meteorologia': ('cloud', 'lightgray'), 
                     'Focos Incd': ('fire', 'green' if fogo_extinto else 'red'), 
@@ -182,15 +181,25 @@ if df is not None:
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                popup_text = f"""
-                <div style='font-family: Arial; font-size: 12px; width: 220px;'>
-                    <b style='color:#003366;'>LOCAL/ID:</b> {row['aeronave']}<br>
-                    <b style='color:#003366;'>INFO/METAR:</b><br><code style='background:#f4f4f4; display:block; padding:5px; margin-top:2px;'>{row['missao']}</code>
-                    <hr style='margin:5px 0;'>
-                    <b>STATUS:</b> {row['status_foco']}<br>
-                    <b>SOLUÇÃO:</b> {row['horario_solucao']}
-                </div>
-                """
+                # LÓGICA DE POPUP DIFERENCIADA PARA METAR
+                if is_met:
+                    popup_text = f"""
+                    <div style='font-family: Arial; font-size: 12px; width: 220px;'>
+                        <b style='color:#003366;'>ESTAÇÃO:</b> {row['aeronave']}<br>
+                        <b style='color:#003366;'>METAR:</b><br>
+                        <code style='background:#f4f4f4; display:block; padding:8px; margin-top:5px; border-left:3px solid #00d4ff;'>{row['missao']}</code>
+                    </div>
+                    """
+                else:
+                    popup_text = f"""
+                    <div style='font-family: Arial; font-size: 12px; width: 220px;'>
+                        <b style='color:#003366;'>ID/VETOR:</b> {row['aeronave']}<br>
+                        <b style='color:#003366;'>MISSÃO:</b> {row['missao']}
+                        <hr style='margin:5px 0;'>
+                        <b>STATUS:</b> {row['status_foco']}<br>
+                        <b>SOLUÇÃO:</b> {row['horario_solucao']}
+                    </div>
+                    """
                 
                 folium.Marker(
                     [row['lat_clean'], row['lon_clean']], 
