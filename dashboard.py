@@ -167,27 +167,20 @@ if df is not None:
         
         for _, row in df_filtered.iterrows():
             if row['lat_clean'] is not None and row['lon_clean'] is not None:
-                layer_clean = str(row['LAYER']).lower()
-                is_met = "meteorologia" in layer_clean
-                is_fire = "focos incd" in layer_clean
-                is_aero = "meios aéreos" in layer_clean
-                
-                fogo_extinto = "extinto" in str(row['status_foco']).lower() or "controlado" in str(row['status_foco']).lower()
-                
                 icon_map = {
                     'Meteorologia': ('cloud', 'lightgray'), 
-                    'Focos Incd': ('fire', 'green' if fogo_extinto else 'red'), 
+                    'Focos Incd': ('fire', 'green' if "extinto" in str(row['status_foco']).lower() else 'red'), 
                     'Meios Aéreos': ('plane', 'cadetblue')
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                # POPUP UNIFICADO: EXIBE APENAS COLUNAS A, B, C, D (LAYER, AERONAVE, MISSAO, STATUS)
+                # POPUP: SUPRESSÃO DO LAYER (A) E INCLUSÃO DE LAT/LONG (C,D) NA ÚLTIMA LINHA
                 popup_text = f"""
                 <div style='font-family: Arial; font-size: 13px; width: 250px; background:#f4f4f4; padding:12px; border-radius:8px; border-left:5px solid {icon_color}; line-height:1.4;'>
-                    <b style='color:#333;'>{row['LAYER']}</b><br>
                     <b style='color:#003366;'>{row['aeronave']}</b><br>
                     {row['missao']}<br>
-                    <i style='color:#555;'>{row['status_foco']}</i>
+                    <hr style='margin:5px 0; border:0; border-top:1px solid #ccc;'>
+                    <span style='color:#555; font-size:11px; font-family:monospace;'>{row['lat']} / {row['lon']}</span>
                 </div>
                 """
                 
