@@ -71,21 +71,12 @@ st.markdown(f"""
         display: flex; align-items: center; justify-content: space-between;
         padding: 0 30px; border-bottom: 1px solid rgba(0, 212, 255, 0.2);
     }}
-    .zulu-time {{ font-family: 'Segoe UI', sans-serif; font-size: 1.8rem; font-weight: 300; }}
-    .mission-title {{
-        position: absolute; left: 50%; transform: translateX(-50%);
-        font-family: 'Arial Black', sans-serif; font-size: 2.2rem;
-        letter-spacing: 3px; text-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
-    }}
     .main-content {{ margin-top: 90px; }}
-    
     .section-card {{
         background: rgba(0, 30, 70, 0.3); border: 1px solid rgba(0, 212, 255, 0.1);
         border-radius: 8px; padding: 15px; margin-bottom: 15px;
     }}
-    
     .card-height-align {{ height: 500px; }}
-    
     [data-testid="stMetricValue"] {{ font-size: 2.8rem !important; color: #00d4ff !important; font-weight: bold; }}
     </style>
     """, unsafe_allow_html=True)
@@ -108,7 +99,7 @@ st.markdown(f"""
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
-    # --- FILTROS Y MAPA ---
+    # --- COLUNA 1: MAPA / COLUNA 2: VECTORES ---
     c1, c2 = st.columns([2.5, 1])
     
     with c1:
@@ -131,7 +122,7 @@ if df is not None:
                 color = 'red' if 'Focos' in row['LAYER'] else 'blue'
                 icon = 'fire' if 'Focos' in row['LAYER'] else 'plane'
                 folium.Marker([row['lat_clean'], row['lon_clean']], 
-                              popup=f"{row['aeronave']} - {row['missao']}",
+                              popup=f"{row['aeronave']} - {row['misión' if 'misión' in df.columns else 'missao']}",
                               icon=folium.Icon(color=color, icon=icon, prefix='fa')).add_to(m)
         
         st_folium(m, width="100%", height=360, key="map_main")
@@ -139,63 +130,64 @@ if df is not None:
 
     with c2:
         st.markdown('<div class="section-card card-height-align">', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:1.2rem; margin-bottom:5px;">📊 VECTORES</p>', unsafe_allow_html=True)
+        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:1.2rem;">📊 VECTORES</p>', unsafe_allow_html=True)
         
         df_operacion = df[df['LAYER']=='Meios Aéreos']
-        
         st.metric("EN OPERACIÓN", len(df_operacion))
         
-        # Traducción de encabezados en la tabla lateral
         st.dataframe(
-            df_operacion[['aeronave', 'missao']].rename(columns={'aeronave': 'aeronave', 'missao': 'misión'}), 
-            hide_index=True, 
-            use_container_width=True,
-            height=300
+            df_operacion[['aeronave', 'missao']].rename(columns={'missao': 'misión'}), 
+            hide_index=True, use_container_width=True, height=300
         )
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- LÍNEA DEL TIEMPO (TIMELINE) ---
+    # --- LÍNEA DEL TIEMPO (FILTRADA POR MEIOS AÉREOS E REUNIÕES) ---
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.markdown('<p style="color:#00d4ff; font-weight:bold; font-size:1rem; margin-bottom:10px;">⏳ LÍNEA DEL TIEMPO</p>', unsafe_allow_html=True)
     
-    df_timeline = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
+    # Filtro dinâmico: Apenas o que for Meios Aéreos ou Reunião
+    # Ajuste os nomes "Meios Aéreos" e "Reunião" se eles forem diferentes na sua planilha
+    filtro_timeline = df['LAYER'].isin(['Meios Aéreos', 'Reunião', 'Reunión', 'REUNIÃO'])
+    df_timeline = df[filtro_timeline & df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
+
     if not df_timeline.empty:
-        # 'text' usa la columna LAYER (A) para mostrar dentro del polígono
+        # 'text' exibe o conteúdo da Coluna A (LAYER) dentro da barra
         fig = px.timeline(df_timeline, 
                           x_start="inicio_zulu", 
                           x_end="fim_zulu", 
                           y="aeronave", 
-                          color="aeronave", 
-                          text="LAYER",
+                          color="LAYER", # Cores separadas por tipo (Meio ou Reunião)
+                          text="LAYER", 
                           template="plotly_dark", 
-                          height=300)
+                          height=350)
         
         fig.add_vline(x=now_z, line_width=3, line_color="#ff4b4b")
         
         fig.update_layout(
-            showlegend=False, 
+            showlegend=True, 
+            legend_title_text="Tipo",
             margin=dict(l=0, r=0, t=30, b=10),
             xaxis=dict(side="top", title=None, 
-                       range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)]),
+                       range=[now_z - timedelta(hours=6), now_z + timedelta(hours=6)]),
             yaxis=dict(title=None), 
             paper_bgcolor='rgba(0,0,0,0)', 
             plot_bgcolor='rgba(0,0,0,0)'
         )
         
-        # Centralizar texto dentro de las barras
+        # Garante que o texto da Coluna A fique centralizado dentro do polígono
         fig.update_traces(textposition='inside', insidetextanchor='middle')
         
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    else:
+        st.info("No hay datos de 'Medios Aéreos' o 'Reuniones' para mostrar en la línea del tiempo.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- DETALLE DE MISIONES ---
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.markdown('<p style="color:#00ff7f; font-weight:bold; font-size:0.9rem;">📋 DETALLE DE MISIONES</p>', unsafe_allow_html=True)
     
-    # Traduciendo encabezados de la tabla detallada
     df_detalle = df[['LAYER', 'aeronave', 'missao', 'lat', 'lon']].dropna(subset=['aeronave'])
     df_detalle.columns = ['CAPA', 'AERONAVE', 'MISIÓN', 'LAT', 'LON']
-    
     st.dataframe(df_detalle, use_container_width=True, hide_index=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
