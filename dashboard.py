@@ -33,16 +33,13 @@ def parse_coordinate(coord):
     except: return None
 
 def format_to_military(decimal_coord, is_lat=True):
-    # --- CORREÇÃO DO ERRO (Value Error Protection) ---
     if decimal_coord is None or pd.isna(decimal_coord): 
         return "N/A"
-    
     try:
         abs_val = abs(decimal_coord)
         degrees = int(abs_val)
         minutes = int((abs_val - degrees) * 60)
         seconds = int((abs_val - degrees - minutes/60) * 3600)
-        
         if is_lat:
             designator = "S" if decimal_coord < 0 else "N"
         else:
@@ -70,16 +67,11 @@ def load_data(url):
         for col in required_cols:
             if col not in df_raw.columns:
                 df_raw[col] = ""
-        
         for col in ['status_foco', 'LAYER', 'aeronave', 'missao']:
             df_raw[col] = df_raw[col].astype(str).replace('nan', '')
-        
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
-        
-        # Coluna auxiliar para o texto da Timeline
         df_raw['label_timeline'] = df_raw['aeronave'] + "<br>" + df_raw['missao']
-        
         df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         return df_raw
@@ -101,17 +93,26 @@ if df is not None:
         (~df['status_foco'].str.contains("Extinto|Controlado", case=False, na=False))
     ].empty
 
-# --- ESTILO CSS ---
+# --- ESTILO CSS (INCLUINDO REMOÇÃO DA BARRA DEPLOY) ---
 borda_cor = "rgba(0, 255, 127, 0.4)" if not focos_ativos else "rgba(255, 0, 0, 0.7)"
 animacao = "none" if not focos_ativos else "pulse 1.5s infinite"
 
 st.markdown(f"""
     <style>
+    /* Ocultar Barra de Deploy e Menus padrão */
+    .stAppDeployButton {{ display: none !important; }}
+    #MainMenu {{ visibility: hidden; }}
+    header {{ visibility: hidden; height: 0; }}
+    footer {{ visibility: hidden; }}
+    [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"] {{ display: none !important; }}
+    
     .block-container {{ padding-top: 0rem; padding-bottom: 0rem; padding-left: 1rem; padding-right: 1rem; }}
     [data-testid="stVerticalBlock"] > div {{ padding-top: 0.1rem; padding-bottom: 0.1rem; }}
     html, body, [data-testid="stTickBarMin"] {{ color: white !important; }}
     p, span, label, div, h1, h2, h3, h4, h5, h6 {{ color: white !important; }}
     .stApp {{ background-color: #001233; }}
+    
+    /* Cabeçalho */
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; height: 80px;
         background: rgba(0, 18, 51, 0.95); z-index: 999;
@@ -127,6 +128,7 @@ st.markdown(f"""
     .time-label {{ color:#00d4ff; font-size:0.7rem; font-weight:bold; margin:0; }}
     .time-value {{ font-size:2.2rem; color:white; font-family:monospace; font-weight:bold; margin:0; line-height:0.9;}}
     .time-local {{ color:#ffcc00; font-size:0.9rem; font-weight:bold; margin:0; }}
+    
     .main-content {{ margin-top: 85px; }}
     .map-outer-frame {{
         padding: 2px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;
@@ -194,7 +196,6 @@ if df is not None:
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                # CHAMADA SEGURA DA FUNÇÃO
                 lat_mil = format_to_military(row['lat_clean'], is_lat=True)
                 lon_mil = format_to_military(row['lon_clean'], is_lat=False)
                 
@@ -220,9 +221,7 @@ if df is not None:
     # --- LÍNEA DE TIEMPO ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
     st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:0.8rem; margin:0;">LÍNEA DE TIEMPO (Z)</p>', unsafe_allow_html=True)
-    
     df_timeline = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
-    
     if not df_timeline.empty:
         fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="label_timeline", template="plotly_dark")
         fig.add_vline(x=now_z, line_width=2, line_color="#ff4b4b")
