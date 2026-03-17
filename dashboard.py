@@ -11,12 +11,12 @@ import re
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURAÇÃO DE PÁGINA (ESTRITA) ---
-st.set_page_config(layout="wide", page_title="COOPERACIÓN XI - PAINEL TÁTICO", page_icon="✈️")
+st.set_page_config(layout="wide", page_title="COOPERACIÓN XI - PAINEL DE OPERAÇÕES", page_icon="✈️")
 
-# Auto-refresh 15s para Consciência Situacional em Tempo Real
+# Auto-refresh 15s para atualização tática em tempo real
 st_autorefresh(interval=15000, limit=None, key="refresh_dashboard")
 
-# --- MOTOR DE PROCESSAMENTO DE COORDENADAS ---
+# --- FUNÇÕES AUXILIARES TÉCNICAS ---
 def parse_coordinate(coord):
     if pd.isna(coord) or str(coord).strip() == "": return None
     c = str(coord).strip().upper().replace(',', '.')
@@ -36,7 +36,7 @@ def get_base64(bin_file):
             return base64.b64encode(f.read()).decode()
     return None
 
-# --- CARGA DE DADOS ---
+# --- CARGA DE DADOS COM CACHE DINÂMICO ---
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxvtVEGGjxGS316VCXhFUDv7AA9WaPSNql8ncUFu6Kn0d39BPr7XMS6WSSn8JJ6VAVDUAJ9AshQ1bi/pub?output=csv"
 ARQUIVO_BOLACHA = "bolcaha cooperacion.png"
 
@@ -49,56 +49,70 @@ def load_data(url):
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
-        if 'surtidas' not in df_raw.columns: df_raw['surtidas'] = 1
         return df_raw
     except: return None
 
 df = load_data(URL_PLANILHA)
 now_z = datetime.now(timezone.utc)
-now_l = now_z - timedelta(hours=4) # Local (MS)
+now_l = now_z - timedelta(hours=4) # Fuso Campo Grande / MS
 
-# --- CSS DE ALTA PERFORMANCE (MILITAR DARK) ---
+# --- CSS PERSONALIZADO (IDENTIDADE VISUAL COOPERACIÓN XI) ---
 st.markdown(f"""
     <style>
-    .stApp {{ background-color: #001233; color: white; }}
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+    
+    .stApp {{ 
+        background-color: #001233; 
+        background-image: radial-gradient(circle at 50% 50%, #001e4d 0%, #001233 100%);
+        color: #e0e0e0; 
+    }}
+    
     [data-testid="stHeader"] {{ display: none; }}
     
-    /* BARRA SUPERIOR FIXA */
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 120px;
-        background: rgba(0, 18, 51, 0.85); backdrop-filter: blur(12px);
+        position: fixed; top: 0; left: 0; width: 100%; height: 100px;
+        background: rgba(0, 18, 51, 0.85); backdrop-filter: blur(10px);
         z-index: 1000; display: flex; align-items: center; justify-content: space-between;
-        padding: 0 50px; border-bottom: 3px solid #00d4ff;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }}
-    
-    .main-content {{ margin-top: 140px; padding: 0 30px; }}
-    
-    /* CARDS COM GLOW CIANO */
-    .section-card {{
-        background: rgba(0, 30, 70, 0.4); 
-        border: 1px solid rgba(0, 212, 255, 0.2);
-        border-radius: 8px; padding: 15px; margin-bottom: 20px;
-        box-shadow: 0 4px 15px rgba(0,0,0,0.3), inset 0 0 10px rgba(0,212,255,0.05);
+        padding: 0 30px; border-bottom: 2px solid #00d4ff;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.5);
     }}
 
-    /* FORMATAÇÃO DE TABELAS */
-    div[data-testid="stDataFrame"] {{ background: transparent !important; }}
+    .main-content {{ margin-top: 110px; }}
+
+    .section-card {{
+        background: rgba(0, 30, 70, 0.4); 
+        border-left: 4px solid #00d4ff;
+        border-radius: 4px; padding: 20px; 
+        box-shadow: 5px 5px 15px rgba(0,0,0,0.3);
+        margin-bottom: 20px;
+    }}
+
+    .status-panel {{
+        background: rgba(0, 40, 85, 0.6);
+        border: 1px solid #00d4ff;
+        box-shadow: 0 0 15px rgba(0, 212, 255, 0.2);
+        padding: 15px; border-radius: 8px;
+    }}
+
+    h1, h2, h3 {{ font-family: 'Orbitron', sans-serif !important; color: #00d4ff !important; }}
+    
+    /* Customização de Tabelas */
+    .stDataFrame, .stTable {{ background: transparent !important; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- CABEÇALHO ---
+# --- HEADER TÁTICO ---
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
 logo_html = f'<img src="data:image/png;base64,{logo_b64}" width="180">' if logo_b64 else ""
 
 st.markdown(f"""
     <div class="fixed-header">
         <div style="flex: 1;">
-            <div style="font-size: 2.8rem; font-weight: bold; color: white; line-height: 1;">{now_z.strftime('%H:%M:%S')} Z</div>
-            <div style="font-size: 1.1rem; color: #ffcc00; font-weight: bold; margin-top: 5px;">LOCAL: {now_l.strftime('%H:%M')} P</div>
+            <div style="font-family: 'Orbitron'; font-size: 1.8rem; color: #ffffff;">{now_z.strftime('%H:%M:%S')} Z</div>
+            <div style="font-size: 0.9rem; color: #00d4ff;">LOCAL: {now_l.strftime('%H:%M')} P</div>
         </div>
         <div style="flex: 2; text-align: center;">
-            <div style="font-family: 'Arial Black', sans-serif; font-size: 3rem; letter-spacing: 6px; color: white; text-shadow: 0 0 15px #00d4ff;">
+            <div style="font-family: 'Orbitron'; font-size: 2.2rem; font-weight: bold; letter-spacing: 5px; text-shadow: 0 0 10px #00d4ff;">
                 COOPERACIÓN XI
             </div>
         </div>
@@ -111,64 +125,94 @@ st.markdown(f"""
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
-    # --- BLOCO 1: MAPA E STATUS (SIMETRIA TOTAL) ---
-    col_mapa, col_tabela = st.columns([1.5, 1])
+    # --- COLUNA SUPERIOR: STATUS E MAPA ---
+    col_stat, col_map = st.columns([1, 2.3])
 
-    with col_mapa:
-        st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown('<p style="color:#00d4ff; font-weight:bold; margin-bottom:10px;">📍 CONSCIÊNCIA GEOGRÁFICA</p>', unsafe_allow_html=True)
+    with col_stat:
+        st.markdown('<div class="status-panel">', unsafe_allow_html=True)
+        st.subheader("📊 STATUS OPERACIONAL")
         
-        # Mapa com tiles claros para destacar marcadores
-        m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', zoom_control=False)
+        # Métricas Rápidas
+        m1, m2 = st.columns(2)
+        total_vetores = df['aeronave'].nunique()
+        m1.metric("VETORES", total_vetores)
+        m2.metric("MISSÕES", len(df))
+        
+        st.markdown("---")
+        # Tabela Consolidada de Meios
+        df_resumo = df.groupby(['aeronave', 'missao']).size().reset_index(name='QTD')
+        st.dataframe(df_resumo, use_container_width=True, hide_index=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with col_map:
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        # Mapa com tiles limpos para foco operacional
+        m = folium.Map(location=[-19.5, -57.0], zoom_start=6, tiles='cartodbpositron', zoom_control=False)
         
         for _, row in df.dropna(subset=['lat_clean', 'lon_clean']).iterrows():
-            # Vermelho para Fogo, Azul para Meios
-            is_fire = 'FOGO' in str(row.get('missao', '')).upper()
-            color = 'red' if is_fire else 'cadetblue'
+            # Diferenciação de cor: Foco de Incêndio (Vermelho) vs Meios (Azul)
+            is_fire = 'FOGO' in str(row.get('missao', '')).upper() or 'INCENDIO' in str(row.get('missao', '')).upper()
+            color = 'red' if is_fire else 'blue'
+            
             folium.Marker(
                 [row['lat_clean'], row['lon_clean']],
-                icon=folium.Icon(color=color, icon='plane' if not is_fire else 'fire', prefix='fa'),
-                tooltip=f"Vetor: {row['aeronave']}"
+                popup=f"<b>{row['aeronave']}</b><br>{row['missao']}",
+                icon=folium.Icon(color=color, icon='plane' if not is_fire else 'fire', prefix='fa')
             ).add_to(m)
         
-        st_folium(m, width="100%", height=380, key="mapa_main")
+        st_folium(m, width="100%", height=400, key="mapa_operacional")
         st.markdown('</div>', unsafe_allow_html=True)
 
-    with col_tabela:
-        st.markdown('<div class="section-card" style="height: 442px;">', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold;">📊 VECTORES EM OPERAÇÃO</p>', unsafe_allow_html=True)
-        
-        # Consolidação de dados
-        df_v = df[df['LAYER'].str.contains("Meios", na=False)].groupby(['aeronave', 'missao'])['surtidas'].sum().reset_index()
-        
-        st.dataframe(df_v, use_container_width=True, hide_index=True, height=350)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- BLOCO 2: TIMELINE (CENTRALIZADA EM T) ---
+    # --- TIMELINE CENTRALIZADA (T-4h até T+4h) ---
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<p style="color:#00d4ff; font-weight:bold;">🕒 LINHA DO TEMPO (T ± 4h)</p>', unsafe_allow_html=True)
+    st.subheader("🕒 LINHA DO TEMPO (ZULU)")
     
     df_t = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     if not df_t.empty:
         fig = px.timeline(
             df_t, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave",
-            color="aeronave", text="missao", template="plotly_dark"
+            color="aeronave", text="missao", template="plotly_dark",
+            color_discrete_sequence=px.colors.qualitative.Pastel
         )
-        # Janela de visualização centrada no tempo atual
+        
+        # Centralização rigorosa no Tempo Zulu Atual
+        t_min = now_z - timedelta(hours=4)
+        t_max = now_z + timedelta(hours=4)
+        
         fig.update_layout(
-            height=300, margin=dict(l=10, r=10, t=10, b=10),
-            xaxis_range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)],
+            height=320,
+            xaxis_range=[t_min, t_max],
+            margin=dict(l=10, r=10, t=10, b=10),
             showlegend=False,
-            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
+            xaxis=dict(gridcolor="rgba(255,255,255,0.1)", title="HORA ZULU"),
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)'
         )
-        fig.add_vline(x=now_z, line_width=3, line_dash="dash", line_color="red")
+        # Linha indicadora de tempo real (T)
+        fig.add_vline(x=now_z, line_width=3, line_dash="dash", line_color="#00d4ff")
+        
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
+    else:
+        st.info("Aguardando dados de cronograma para gerar Timeline.")
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- BLOCO 3: BANCO DE DADOS COMPLETO ---
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<p style="color:#00d4ff; font-weight:bold;">🔍 CONSULTA GERAL DE MISSÕES</p>', unsafe_allow_html=True)
-    st.dataframe(df.drop(columns=['lat_clean', 'lon_clean'], errors='ignore'), use_container_width=True, hide_index=True)
-    st.markdown('</div>', unsafe_allow_html=True)
+    # --- BUSCA E DETALHAMENTO ---
+    with st.expander("🔍 CONSULTAR RECURSOS E COORDENADAS"):
+        busca = st.text_input("Filtrar por aeronave, missão ou localidade:", placeholder="Ex: C-105")
+        if busca:
+            df_view = df[df.apply(lambda row: busca.lower() in row.astype(str).str.lower().values, axis=1)]
+        else:
+            df_view = df
+        
+        st.dataframe(df_view.drop(columns=['lat_clean', 'lon_clean'], errors='ignore'), use_container_width=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
+
+# Script para Auto-Refresh forçado via JS (Redundância)
+st.components.v1.html("""
+<script>
+    setTimeout(function(){
+        window.location.reload();
+    }, 15000);
+</script>
+""", height=0)
