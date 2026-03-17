@@ -58,7 +58,7 @@ df = load_data(URL_PLANILHA)
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
 
-# --- CSS AVANÇADO ---
+# --- CSS DE CONTROLE DE LAYOUT ---
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #000b1e; color: white; }}
@@ -71,44 +71,47 @@ st.markdown(f"""
         padding: 0 40px; border-bottom: 2px solid #00d4ff;
     }}
     
-    .main-content {{ margin-top: 130px; }}
+    .main-content {{ margin-top: 130px; padding: 0 20px; }}
     
-    .section-card {{
-        background: rgba(0, 30, 70, 0.4); 
-        border: 1px solid rgba(0, 212, 255, 0.1);
-        border-radius: 4px; 
-        padding: 15px; 
-        margin-bottom: 15px;
+    /* FORÇAR LADO A LADO */
+    [data-testid="column"] {{
+        display: flex;
+        flex-direction: column;
     }}
 
-    /* Estilização para garantir que a tabela ocupe o espaço correto */
-    div[data-testid="stTable"] {{
-        background: transparent !important;
-        margin-top: 10px;
+    .section-card {{
+        background: rgba(0, 30, 70, 0.4); 
+        border: 1px solid rgba(0, 212, 255, 0.2);
+        border-radius: 6px; 
+        padding: 10px;
+        margin-bottom: 10px;
     }}
+
+    /* Ajuste para a tabela lateral não esticar */
+    .small-font {{ font-size: 12px !important; }}
     </style>
     """, unsafe_allow_html=True)
 
 # --- HEADER ---
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
-logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="110">' if logo_b64 else ""
+logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="100">' if logo_b64 else ""
 
 st.markdown(f"""
     <div class="fixed-header">
-        <div style="min-width: 250px;">
-            <div style="font-size: 2.5rem; font-weight: bold; color: white;">{now_z.strftime('%H:%M:%S')}Z</div>
-            <div style="font-size: 1.1rem; color: #ffcc00; font-weight: bold;">LOCAL: {now_p.strftime('%H:%M')}P</div>
+        <div style="min-width: 200px;">
+            <div style="font-size: 2.2rem; font-weight: bold; color: white;">{now_z.strftime('%H:%M:%S')}Z</div>
+            <div style="font-size: 1rem; color: #ffcc00; font-weight: bold;">LOCAL: {now_p.strftime('%H:%M')}P</div>
         </div>
-        <div style="font-family: 'Arial Black'; font-size: 2.8rem; letter-spacing: 4px; color: white; text-shadow: 0 0 15px #00d4ff;">COOPERACIÓN XI</div>
-        <div style="min-width: 250px; text-align: right;">{logo_html}</div>
+        <div style="font-family: 'Arial Black'; font-size: 2.5rem; letter-spacing: 3px; color: white; text-shadow: 0 0 10px #00d4ff;">COOPERACIÓN XI</div>
+        <div style="min-width: 200px; text-align: right;">{logo_html}</div>
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
-    # --- 1. DASHBOARD TÁTICO: MAPA E RESUMO LADO A LADO ---
-    col_map, col_stat = st.columns([1.6, 1])
+    # --- LINHA 1: MAPA E TABELA (LADO A LADO REAL) ---
+    col_map, col_stat = st.columns([1.2, 1])
     
     with col_map:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
@@ -117,44 +120,37 @@ if df is not None:
             c = 'cadetblue' if 'Meios' in str(row.get('LAYER', '')) else 'red'
             folium.Marker([row['lat_clean'], row['lon_clean']], 
                           icon=folium.Icon(color=c, icon='plane', prefix='fa')).add_to(m)
-        st_folium(m, width="100%", height=400, key="mapa_coi")
+        # Diminuído para garantir encaixe
+        st_folium(m, width=550, height=320, key="mapa_coi")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_stat:
-        # Tudo aqui dentro será renderizado no painel à direita do mapa
-        st.markdown('<div class="section-card" style="height: 425px;">', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom: 20px;">📊 VECTORES EM OPERAÇÃO</p>', unsafe_allow_html=True)
+        st.markdown('<div class="section-card" style="height: 342px; overflow: hidden;">', unsafe_allow_html=True)
+        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size: 0.9rem; margin:0;">📊 VECTORES EM OPERAÇÃO</p>', unsafe_allow_html=True)
         
-        # Lógica de dados para a tabela lateral
         df_v = df[df['LAYER'].str.contains("Meios", na=False)].groupby(['aeronave', 'missao'])['surtidas'].sum().reset_index()
         
-        # Renderização da tabela DENTRO da coluna lateral
-        st.dataframe(df_v, use_container_width=True, hide_index=True)
+        # Tabela reduzida e compacta
+        st.dataframe(df_v, use_container_width=True, hide_index=True, height=280)
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- 2. TIMELINE ---
+    # --- LINHA 2: TIMELINE ---
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     df_t = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     if not df_t.empty:
         fig = px.timeline(df_t, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", 
                           text="label_timeline", color="aeronave", template="plotly_dark")
-        fig.add_vline(x=now_z, line_width=3, line_color="red")
-        fig.update_layout(height=280, margin=dict(l=0, r=0, t=30, b=0), showlegend=False)
+        fig.add_vline(x=now_z, line_width=2, line_color="red")
+        fig.update_layout(height=220, margin=dict(l=0, r=0, t=20, b=0), showlegend=False)
         st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- 3. CAMPO DE BUSCA E TABELA DETALHADA ---
+    # --- LINHA 3: BUSCA ---
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<p style="color:#00d4ff; font-weight:bold;">🔍 BUSCA RÁPIDA DE MISSÕES</p>', unsafe_allow_html=True)
-    busca = st.text_input("Filtrar por aeronave, missão ou localidade:", placeholder="Ex: C-105")
-    
-    if busca:
-        df_filtered = df[df.apply(lambda row: busca.lower() in row.astype(str).str.lower().values, axis=1)]
-    else:
-        df_filtered = df
-
+    busca = st.text_input("🔍 Filtrar missões:", placeholder="Digite aeronave ou local...")
+    df_filtered = df[df.apply(lambda row: busca.lower() in row.astype(str).str.lower().values, axis=1)] if busca else df
     st.dataframe(df_filtered.drop(columns=['lat_clean', 'lon_clean', 'label_timeline'], errors='ignore'), 
-                  use_container_width=True, hide_index=True)
+                  use_container_width=True, hide_index=True, height=200)
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
