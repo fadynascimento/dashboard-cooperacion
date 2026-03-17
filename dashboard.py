@@ -124,7 +124,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER (SEM CONTADOR) ---
+# --- HEADER ---
 st.markdown(f"""
     <div class="fixed-header">
         <div style="position: absolute; left: 20px; text-align: left; border-left: 3px solid #00d4ff; padding-left: 15px;">
@@ -165,7 +165,10 @@ if df is not None:
         
         for _, row in df_filtered.iterrows():
             if row['lat_clean'] is not None and row['lon_clean'] is not None:
-                is_met = "meteorologia" in str(row['LAYER']).lower()
+                layer_clean = str(row['LAYER']).lower()
+                is_met = "meteorologia" in layer_clean
+                is_fire = "focos incd" in layer_clean
+                
                 fogo_extinto = "extinto" in str(row['status_foco']).lower() or "controlado" in str(row['status_foco']).lower()
                 
                 icon_map = {
@@ -175,13 +178,17 @@ if df is not None:
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                if is_met:
+                # AJUSTE DOS POPUPS (METAR E INCÊNDIO LIMPAM RÓTULOS)
+                if is_met or is_fire:
+                    # Estilo diferenciado para camadas de observação (apenas informação bruta)
+                    border_color = "#00d4ff" if is_met else "#ff4b4b"
                     popup_text = f"""
-                    <div style='font-family: monospace; font-size: 13px; width: 240px; background:#f4f4f4; padding:10px; border-radius:5px; border-left:4px solid #00d4ff;'>
+                    <div style='font-family: monospace; font-size: 13px; width: 240px; background:#f4f4f4; padding:10px; border-radius:5px; border-left:4px solid {border_color};'>
                         {row['missao']}
                     </div>
                     """
                 else:
+                    # Estilo padrão para Meios Aéreos (mantém identificação)
                     popup_text = f"""
                     <div style='font-family: Arial; font-size: 12px; width: 220px;'>
                         <b style='color:#003366;'>ID/VETOR:</b> {row['aeronave']}<br>
