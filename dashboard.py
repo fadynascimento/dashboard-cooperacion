@@ -16,7 +16,7 @@ st.set_page_config(layout="wide", page_title="COOPERACIÓN XI - COI", page_icon=
 # --- AUTO-REFRESH NATIVO (15 segundos) ---
 st_autorefresh(interval=15000, limit=None, key="refresh_dashboard")
 
-# --- FUNÇÕES AUXILIARES ---
+# --- FUNÇÕES AUXILIARES DE COORDENADAS ---
 def parse_coordinate(coord):
     if pd.isna(coord) or str(coord).strip() == "": return None
     c = str(coord).strip().upper().replace(',', '.')
@@ -31,6 +31,21 @@ def parse_coordinate(coord):
         elif '-' in c and val > 0: val = -val
         return val
     except: return None
+
+def format_to_military(decimal_coord, is_lat=True):
+    """Converte decimal para Graus Minutos Segundos no padrão militar W/S"""
+    if decimal_coord is None: return ""
+    abs_val = abs(decimal_coord)
+    degrees = int(abs_val)
+    minutes = int((abs_val - degrees) * 60)
+    seconds = int((abs_val - degrees - minutes/60) * 3600)
+    
+    if is_lat:
+        designator = "S" if decimal_coord < 0 else "N"
+    else:
+        designator = "W" if decimal_coord < 0 else "E"
+        
+    return f"{degrees:02d}°{minutes:02d}'{seconds:02d}\"{designator}"
 
 def get_base64(bin_file):
     if os.path.exists(bin_file):
@@ -53,13 +68,6 @@ def load_data(url):
             if col not in df_raw.columns:
                 df_raw[col] = ""
         
-        df_raw['status_foco'] = df_raw['status_foco'].astype(str).replace('nan', '')
-        df_raw['LAYER'] = df_raw['LAYER'].astype(str).replace('nan', '')
-        df_raw['aeronave'] = df_raw['aeronave'].astype(str).replace('nan', '')
-        df_raw['missao'] = df_raw['missao'].astype(str).replace('nan', '')
-        
-        df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
-        df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         return df_raw
@@ -78,7 +86,7 @@ focos_ativos = False
 if df is not None:
     focos_ativos = not df[
         (df['LAYER'].str.contains("Focos Incd", case=False, na=False)) & 
-        (~df['status_foco'].str.contains("Extinto|Controlado", case=False, na=False))
+        (~df['status_foco'].astype(str).str.contains("Extinto|Controlado", case=False, na=False))
     ].empty
 
 # --- ESTILIZAÇÃO CSS ---
@@ -174,13 +182,16 @@ if df is not None:
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                # POPUP: SUPRESSÃO DO LAYER (A) E INCLUSÃO DE LAT/LONG (C,D) NA ÚLTIMA LINHA
+                # CONVERSÃO PARA PADRÃO MILITAR GMS
+                lat_mil = format_to_military(row['lat_clean'], is_lat=True)
+                lon_mil = format_to_military(row['lon_clean'], is_lat=False)
+                
                 popup_text = f"""
                 <div style='font-family: Arial; font-size: 13px; width: 250px; background:#f4f4f4; padding:12px; border-radius:8px; border-left:5px solid {icon_color}; line-height:1.4;'>
                     <b style='color:#003366;'>{row['aeronave']}</b><br>
                     {row['missao']}<br>
                     <hr style='margin:5px 0; border:0; border-top:1px solid #ccc;'>
-                    <span style='color:#555; font-size:11px; font-family:monospace;'>{row['lat']} / {row['lon']}</span>
+                    <span style='color:#222; font-size:12px; font-weight:bold; font-family:monospace;'>{lat_mil} / {lon_mil}</span>
                 </div>
                 """
                 
@@ -210,7 +221,6 @@ if df is not None:
         if focos_ativos:
             st.error("🚨 FOCOS DE INCÊNDIO ATIVOS")
 
-    # --- AÇÕES (Z) ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
     st.markdown(f"""<div style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom:10px;">AÇÕES (Z)</div>""", unsafe_allow_html=True)
     
@@ -221,7 +231,6 @@ if df is not None:
         st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- MANIFESTO ---
     st.markdown("<br><h4 style='color:#00d4ff;'>📝 MANIFESTO DE MISSÕES</h4>", unsafe_allow_html=True)
     st.dataframe(df[['aeronave', 'missao', 'LAYER', 'status_foco', 'horario_solucao', 'inicio_zulu', 'fim_zulu']], use_container_width=True, hide_index=True)
 
