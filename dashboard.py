@@ -55,6 +55,8 @@ def load_data(url):
         
         df_raw['status_foco'] = df_raw['status_foco'].astype(str).replace('nan', '')
         df_raw['LAYER'] = df_raw['LAYER'].astype(str).replace('nan', '')
+        df_raw['aeronave'] = df_raw['aeronave'].astype(str).replace('nan', '')
+        df_raw['missao'] = df_raw['missao'].astype(str).replace('nan', '')
         
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
@@ -168,6 +170,7 @@ if df is not None:
                 layer_clean = str(row['LAYER']).lower()
                 is_met = "meteorologia" in layer_clean
                 is_fire = "focos incd" in layer_clean
+                is_aero = "meios aéreos" in layer_clean
                 
                 fogo_extinto = "extinto" in str(row['status_foco']).lower() or "controlado" in str(row['status_foco']).lower()
                 
@@ -178,30 +181,19 @@ if df is not None:
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                # AJUSTE DOS POPUPS (METAR E INCÊNDIO LIMPAM RÓTULOS)
-                if is_met or is_fire:
-                    # Estilo diferenciado para camadas de observação (apenas informação bruta)
-                    border_color = "#00d4ff" if is_met else "#ff4b4b"
-                    popup_text = f"""
-                    <div style='font-family: monospace; font-size: 13px; width: 240px; background:#f4f4f4; padding:10px; border-radius:5px; border-left:4px solid {border_color};'>
-                        {row['missao']}
-                    </div>
-                    """
-                else:
-                    # Estilo padrão para Meios Aéreos (mantém identificação)
-                    popup_text = f"""
-                    <div style='font-family: Arial; font-size: 12px; width: 220px;'>
-                        <b style='color:#003366;'>ID/VETOR:</b> {row['aeronave']}<br>
-                        <b style='color:#003366;'>MISSÃO:</b> {row['missao']}
-                        <hr style='margin:5px 0;'>
-                        <b>STATUS:</b> {row['status_foco']}<br>
-                        <b>SOLUÇÃO:</b> {row['horario_solucao']}
-                    </div>
-                    """
+                # POPUP UNIFICADO: EXIBE APENAS COLUNAS A, B, C, D (LAYER, AERONAVE, MISSAO, STATUS)
+                popup_text = f"""
+                <div style='font-family: Arial; font-size: 13px; width: 250px; background:#f4f4f4; padding:12px; border-radius:8px; border-left:5px solid {icon_color}; line-height:1.4;'>
+                    <b style='color:#333;'>{row['LAYER']}</b><br>
+                    <b style='color:#003366;'>{row['aeronave']}</b><br>
+                    {row['missao']}<br>
+                    <i style='color:#555;'>{row['status_foco']}</i>
+                </div>
+                """
                 
                 folium.Marker(
                     [row['lat_clean'], row['lon_clean']], 
-                    popup=folium.Popup(popup_text, max_width=280), 
+                    popup=folium.Popup(popup_text, max_width=300), 
                     icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')
                 ).add_to(m)
         
