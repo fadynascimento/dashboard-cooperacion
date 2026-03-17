@@ -33,7 +33,6 @@ def parse_coordinate(coord):
     except: return None
 
 def format_to_military(decimal_coord, is_lat=True):
-    """Converte decimal para Graus Minutos Segundos no padrão militar W/S"""
     if decimal_coord is None: return ""
     abs_val = abs(decimal_coord)
     degrees = int(abs_val)
@@ -156,13 +155,13 @@ if df is not None:
     c1, c2 = st.columns([2.3, 1])
     
     with c1:
-        st.markdown("<h4 style='color:#00ff7f;'>📍 CONSCIÊNCIA SITUACIONAL</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color:#00ff7f;'>📍 CONCIENCIA SITUACIONAL</h4>", unsafe_allow_html=True)
         st.markdown('<div class="map-outer-frame">', unsafe_allow_html=True)
         
         lt1, lt2, lt3 = st.columns(3)
-        with lt1: show_met = st.toggle("☁️ Meteorologia", value=True)
+        with lt1: show_met = st.toggle("☁️ Meteorología", value=True)
         with lt2: show_foc = st.toggle("🔥 Focos Incd", value=True)
-        with lt3: show_aero = st.toggle("✈️ Meios Aéreos", value=True)
+        with lt3: show_aero = st.toggle("✈️ Medios aereos", value=True)
         
         active_layers = []
         if show_met: active_layers.append("Meteorologia")
@@ -182,7 +181,6 @@ if df is not None:
                 }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 
-                # CONVERSÃO PARA PADRÃO MILITAR GMS
                 lat_mil = format_to_military(row['lat_clean'], is_lat=True)
                 lon_mil = format_to_military(row['lon_clean'], is_lat=False)
                 
@@ -206,15 +204,15 @@ if df is not None:
 
     with c2:
         st.markdown('<div class="status-panel">', unsafe_allow_html=True)
-        st.markdown("<h4 style='color:#00d4ff; text-align:center;'>📊 STATUS OPERACIONAL</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color:#00d4ff; text-align:center;'>📊 ESTADO OPERATIVO</h4>", unsafe_allow_html=True)
         df_ma = df[df['LAYER'] == "Meios Aéreos"]
         sm1, sm2 = st.columns(2)
-        sm1.metric("VETORES", df_ma['aeronave'].nunique() if not df_ma.empty else 0)
-        sm2.metric("MISSÕES", len(df_ma) if not df_ma.empty else 0)
+        sm1.metric("VECTORES", df_ma['aeronave'].nunique() if not df_ma.empty else 0)
+        sm2.metric("MISIONES", len(df_ma) if not df_ma.empty else 0)
         
         if not df_ma.empty:
             df_resumo = df_ma.groupby(['aeronave', 'missao']).size().reset_index(name='QTD')
-            df_resumo.columns = ['AERONAVE', 'TIPO DE MISSÃO', 'QTD']
+            df_resumo.columns = ['AERONAVE', 'TIPO DE MISIÓN', 'QTD']
             st.dataframe(df_resumo, hide_index=True, use_container_width=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -222,7 +220,7 @@ if df is not None:
             st.error("🚨 FOCOS DE INCÊNDIO ATIVOS")
 
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
-    st.markdown(f"""<div style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom:10px;">AÇÕES (Z)</div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom:10px;">LÍNEA DE TIEMPO (Z)</div>""", unsafe_allow_html=True)
     
     if not df_ma.empty and not df_ma['inicio_zulu'].isna().all():
         fig = px.timeline(df_ma, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="missao", template="plotly_dark")
@@ -231,7 +229,7 @@ if df is not None:
         st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    st.markdown("<br><h4 style='color:#00d4ff;'>📝 MANIFESTO DE MISSÕES</h4>", unsafe_allow_html=True)
+    st.markdown("<br><h4 style='color:#00d4ff;'>📝 MANIFIESTO DE LA MISIÓN</h4>", unsafe_allow_html=True)
     st.dataframe(df[['aeronave', 'missao', 'LAYER', 'status_foco', 'horario_solucao', 'inicio_zulu', 'fim_zulu']], use_container_width=True, hide_index=True)
 
 else:
