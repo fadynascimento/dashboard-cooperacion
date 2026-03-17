@@ -92,12 +92,13 @@ if df is not None:
         (~df['status_foco'].str.contains("Extinto|Controlado", case=False, na=False))
     ].empty
 
-# --- ESTILO CSS ---
+# --- ESTILO CSS RADICAL ---
 borda_cor = "rgba(0, 255, 127, 0.4)" if not focos_ativos else "rgba(255, 0, 0, 0.7)"
 animacao = "none" if not focos_ativos else "pulse 1.5s infinite"
 
 st.markdown(f"""
     <style>
+    /* Ocultar elementos nativos */
     .stAppDeployButton {{ display: none !important; }}
     #MainMenu {{ visibility: hidden; }}
     header {{ visibility: hidden; height: 0; }}
@@ -105,84 +106,92 @@ st.markdown(f"""
     [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"] {{ display: none !important; }}
     
     .block-container {{ padding-top: 0rem; padding-bottom: 0rem; padding-left: 1rem; padding-right: 1rem; }}
-    [data-testid="stVerticalBlock"] > div {{ padding-top: 0.1rem; padding-bottom: 0.1rem; }}
-    html, body, [data-testid="stTickBarMin"] {{ color: white !important; }}
-    p, span, label, div, h1, h2, h3, h4, h5, h6 {{ color: white !important; }}
     .stApp {{ background-color: #001233; }}
     
+    /* CABEÇALHO AMPLIADO */
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 130px;
-        background: rgba(0, 18, 51, 0.98); z-index: 999;
-        display: flex; align-items: center; justify-content: space-between;
-        border-bottom: 2px solid rgba(0, 212, 255, 0.5); backdrop-filter: blur(10px);
-        padding: 0 30px;
+        position: fixed; top: 0; left: 0; width: 100%; height: 160px;
+        background: #001233; z-index: 999;
+        border-bottom: 2px solid rgba(0, 212, 255, 0.5);
+        padding: 0 20px;
+        display: flex;
+        align-items: center;
     }}
-    .title-text {{
-        font-family: 'Arial Black', sans-serif; color: white; letter-spacing: 2px; 
-        font-size: 2rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 15px #00d4ff;
-    }}
-    .time-block {{ text-align: left; margin-top: 0px; }}
-    
-    /* RELÓGIO ZULU MASSIVO */
+
+    /* RELÓGIO ZULU - AGORA REALMENTE GRANDE */
     .time-value {{ 
-        font-size: 6rem; 
+        font-size: 8.5rem; 
         color: white; 
         font-family: 'Courier New', monospace; 
         font-weight: 900; 
-        margin: 0; 
-        line-height: 1.0; 
-        letter-spacing: -4px;
-        text-shadow: 0 0 20px rgba(255, 255, 255, 0.2);
+        line-height: 1;
+        margin-right: 30px;
+        letter-spacing: -5px;
     }}
-    .time-local {{ color: #ffcc00; font-size: 1.2rem; font-weight: bold; margin: 0; padding-top: 0px; }}
     
-    .main-content {{ margin-top: 140px; }}
+    .local-box {{
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+    }}
+
+    .time-local {{ color: #ffcc00; font-size: 1.8rem; font-weight: bold; margin: 0; }}
+    
+    .title-text {{
+        position: absolute;
+        right: 180px;
+        font-family: 'Arial Black', sans-serif; color: white;
+        font-size: 2.2rem; font-weight: 900; text-transform: uppercase;
+        text-shadow: 0 0 15px #00d4ff;
+    }}
+
+    .main-content {{ margin-top: 170px; }}
+    
     .map-outer-frame {{
         padding: 2px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;
         box-shadow: 0 0 10px {borda_cor}; border: 1px solid {borda_cor};
-        animation: {animacao}; margin-bottom: 5px;
+        animation: {animacao};
     }}
     .status-panel {{
-        background: rgba(0, 30, 70, 0.3); border-radius: 10px; padding: 5px;
-        box-shadow: -5px 0 10px rgba(0, 0, 0, 0.5); border: 1px solid rgba(0, 212, 255, 0.1);
+        background: rgba(0, 30, 70, 0.3); border-radius: 10px; padding: 10px;
+        border: 1px solid rgba(0, 212, 255, 0.1);
     }}
     .timeline-card {{
         background: rgba(0, 30, 70, 0.4); border: 1px solid rgba(0, 212, 255, 0.3);
-        border-radius: 8px; padding: 5px; margin-top: 0px;
+        border-radius: 8px; padding: 5px;
     }}
-    .fixed-logo {{ position: fixed; top: 15px; right: 30px; z-index: 1001; }}
+    .fixed-logo {{ position: absolute; right: 30px; top: 15px; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER (RELOJ MASSIVO SEM BARRA AZUL) ---
+# --- HEADER REESTRUTURADO ---
 st.markdown(f"""
     <div class="fixed-header">
-        <div class="time-block">
-            <p class="time-value">{now_z.strftime('%H:%M:%S')}Z</p>
-            <p class="time-local">LOCAL: {now_p.strftime('%H:%M')}P</p>
+        <div class="time-value">{now_z.strftime('%H:%M:%S')}Z</div>
+        <div class="local-box">
+            <div class="time-local">LOCAL: {now_p.strftime('%H:%M')}P</div>
         </div>
         <div class="title-text">COOPERACIÓN XI</div>
-        <div style="width: 250px;"></div>
     </div>
     """, unsafe_allow_html=True)
 
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
 if logo_b64:
-    st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="130"></div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="140"></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
-    c1, c2 = st.columns([2.5, 1])
+    c1, c2 = st.columns([2.2, 1])
     
     with c1:
         st.markdown('<p style="color:#00ff7f; font-size: 1.1rem; margin:0; font-weight:bold;">📍 CONCIENCIA SITUACIONAL</p>', unsafe_allow_html=True)
         st.markdown('<div class="map-outer-frame">', unsafe_allow_html=True)
         
         lt1, lt2, lt3 = st.columns(3)
-        show_met = lt1.toggle("☁️ Meteorología", value=True, key="t1")
-        show_foc = lt2.toggle("🔥 Focos Incd", value=True, key="t2")
-        show_aero = lt3.toggle("✈️ Medios aéreos", value=True, key="t3")
+        show_met = lt1.toggle("☁️ Met", value=True, key="t1")
+        show_foc = lt2.toggle("🔥 Focos", value=True, key="t2")
+        show_aero = lt3.toggle("✈️ Aéreos", value=True, key="t3")
         
         active_layers = []
         if show_met: active_layers.append("Meteorologia")
@@ -194,18 +203,14 @@ if df is not None:
         
         for _, row in df_mapa.iterrows():
             if row['lat_clean'] is not None and row['lon_clean'] is not None:
-                icon_map = {
-                    'Meteorologia': ('cloud', 'lightgray'), 
-                    'Focos Incd': ('fire', 'green' if "extinto" in str(row['status_foco']).lower() else 'red'), 
-                    'Meios Aéreos': ('plane', 'cadetblue')
-                }
+                icon_map = {'Meteorologia': ('cloud', 'lightgray'), 'Focos Incd': ('fire', 'red'), 'Meios Aéreos': ('plane', 'cadetblue')}
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 lat_mil = format_to_military(row['lat_clean'], is_lat=True)
                 lon_mil = format_to_military(row['lon_clean'], is_lat=False)
                 popup_text = f"<div style='color:black; font-size:11px;'><b>{row['aeronave']}</b><br>{row['missao']}<br>{lat_mil}/{lon_mil}</div>"
                 folium.Marker([row['lat_clean'], row['lon_clean']], popup=folium.Popup(popup_text, max_width=200), icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')).add_to(m)
         
-        st_folium(m, width="100%", height=260, key="map_coi")
+        st_folium(m, width="100%", height=280, key="map_coi")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c2:
@@ -215,34 +220,24 @@ if df is not None:
         sm1, sm2 = st.columns(2)
         sm1.metric("VECTORES", df_ma_status['aeronave'].nunique() if not df_ma_status.empty else 0)
         sm2.metric("MISIONES", len(df_ma_status) if not df_ma_status.empty else 0)
-        if not df_ma_status.empty:
-            df_resumo = df_ma_status.groupby(['aeronave', 'missao']).size().reset_index(name='CANT')
-            st.dataframe(df_resumo, hide_index=True, use_container_width=True, height=120)
         st.markdown('</div>', unsafe_allow_html=True)
         if focos_ativos: st.error("🚨 FOCOS ACTIVOS")
 
-    # --- LÍNEA DE TIEMPO (SÓ COLUNA A) ---
-    st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
-    st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:0.9rem; margin:0;">LÍNEA DE TIEMPO (Z)</p>', unsafe_allow_html=True)
+    # --- LÍNEA DE TIEMPO ---
+    st.markdown('<div class="timeline-card" style="margin-top:10px;">', unsafe_allow_html=True)
     df_timeline = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     if not df_timeline.empty:
         fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="aeronave", template="plotly_dark")
         fig.add_vline(x=now_z, line_width=2, line_color="#ff4b4b")
-        fig.update_traces(textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=13))
+        fig.update_traces(textposition='inside', insidetextanchor='middle', textfont=dict(color='white', size=14))
         fig.update_layout(
             xaxis_range=[now_z - timedelta(hours=3), now_z + timedelta(hours=7)],
             paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,212,255,0.02)',
-            showlegend=False, height=260, margin=dict(l=5, r=5, t=5, b=5),
+            showlegend=False, height=280, margin=dict(l=5, r=5, t=5, b=5),
             xaxis=dict(title=None), yaxis=dict(title=None)
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div>', unsafe_allow_html=True)
-
-    # --- MANIFIESTO ---
-    st.markdown("<p style='color:#00d4ff; font-size:1rem; margin-top:5px; font-weight:bold;'>📝 MANIFIESTO DE LA MISIÓN</p>", unsafe_allow_html=True)
-    df_display = df[['aeronave', 'missao', 'LAYER', 'status_foco', 'horario_solucao', 'inicio_zulu', 'fim_zulu']].copy()
-    df_display.columns = ['VECTOR', 'MISIÓN', 'CAPA', 'ESTADO', 'HORA SOLUCIÓN', 'INICIO (Z)', 'FIN (Z)']
-    st.dataframe(df_display, use_container_width=True, hide_index=True, height=140)
 
 else:
     st.warning("🔄 Sincronizando...")
