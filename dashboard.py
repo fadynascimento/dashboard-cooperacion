@@ -58,35 +58,34 @@ df = load_data(URL_PLANILHA)
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
 
-# --- CSS AVANÇADO: LIMPEZA E ALINHAMENTO ---
+# --- CSS AVANÇADO ---
 st.markdown(f"""
     <style>
     .stApp {{ background-color: #000b1e; color: white; }}
     [data-testid="stHeader"] {{ display: none; }}
     
-    /* Limpeza de bordas e alinhamento */
-    [data-testid="stVerticalBlock"], [data-testid="column"] {{
-        border: none !important; outline: none !important; box-shadow: none !important;
-    }}
-    
-    .leaflet-control-attribution, .leaflet-control-zoom {{ display: none !important; }}
-    
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; height: 110px;
-        background: rgba(0, 11, 30, 0.9); backdrop-filter: blur(10px); z-index: 1000;
+        background: #000b1e; z-index: 1000;
         display: flex; align-items: center; justify-content: space-between;
         padding: 0 40px; border-bottom: 2px solid #00d4ff;
     }}
     
-    .main-content {{ margin-top: 130px; padding: 0 20px; }}
+    .main-content {{ margin-top: 130px; }}
     
     .section-card {{
-        background: rgba(0, 30, 70, 0.4); border: 1px solid rgba(0, 212, 255, 0.1);
-        border-radius: 4px; padding: 15px; margin-bottom: 15px;
+        background: rgba(0, 30, 70, 0.4); 
+        border: 1px solid rgba(0, 212, 255, 0.1);
+        border-radius: 4px; 
+        padding: 15px; 
+        margin-bottom: 15px;
     }}
 
-    /* Estilização específica para tabelas Streamlit ficarem integradas */
-    .stTable, .stDataFrame {{ background: transparent !important; }}
+    /* Estilização para garantir que a tabela ocupe o espaço correto */
+    div[data-testid="stTable"] {{
+        background: transparent !important;
+        margin-top: 10px;
+    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -118,17 +117,18 @@ if df is not None:
             c = 'cadetblue' if 'Meios' in str(row.get('LAYER', '')) else 'red'
             folium.Marker([row['lat_clean'], row['lon_clean']], 
                           icon=folium.Icon(color=c, icon='plane', prefix='fa')).add_to(m)
-        st_folium(m, width="100%", height=405, key="mapa_coi")
+        st_folium(m, width="100%", height=400, key="mapa_coi")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with col_stat:
-        st.markdown('<div class="section-card" style="height: 440px; overflow-y: auto;">', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size: 1.2rem;">📊 VECTORES EM OPERAÇÃO</p>', unsafe_allow_html=True)
+        # Tudo aqui dentro será renderizado no painel à direita do mapa
+        st.markdown('<div class="section-card" style="height: 425px;">', unsafe_allow_html=True)
+        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom: 20px;">📊 VECTORES EM OPERAÇÃO</p>', unsafe_allow_html=True)
         
-        # Filtro para meios ativos e agrupamento
+        # Lógica de dados para a tabela lateral
         df_v = df[df['LAYER'].str.contains("Meios", na=False)].groupby(['aeronave', 'missao'])['surtidas'].sum().reset_index()
         
-        # Uso de dataframe para melhor encaixe visual na barra lateral
+        # Renderização da tabela DENTRO da coluna lateral
         st.dataframe(df_v, use_container_width=True, hide_index=True)
         st.markdown('</div>', unsafe_allow_html=True)
 
@@ -146,7 +146,7 @@ if df is not None:
     # --- 3. CAMPO DE BUSCA E TABELA DETALHADA ---
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
     st.markdown('<p style="color:#00d4ff; font-weight:bold;">🔍 BUSCA RÁPIDA DE MISSÕES</p>', unsafe_allow_html=True)
-    busca = st.text_input("Filtrar por aeronave, missão ou localidade:", placeholder="Ex: C-105 ou Campo Grande")
+    busca = st.text_input("Filtrar por aeronave, missão ou localidade:", placeholder="Ex: C-105")
     
     if busca:
         df_filtered = df[df.apply(lambda row: busca.lower() in row.astype(str).str.lower().values, axis=1)]
