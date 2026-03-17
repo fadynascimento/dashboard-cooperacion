@@ -75,7 +75,7 @@ def load_data(url):
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         return df_raw
     except Exception as e:
-        st.error(f"Error al procesar la planilla: {e}")
+        st.error(f"Error al procesar la planilha: {e}")
         return None
 
 df = load_data(URL_PLANILHA)
@@ -92,7 +92,7 @@ if df is not None:
         (~df['status_foco'].str.contains("Extinto|Controlado", case=False, na=False))
     ].empty
 
-# --- ESTILO CSS RADICAL ---
+# --- ESTILO CSS REESTRUTURADO ---
 borda_cor = "rgba(0, 255, 127, 0.4)" if not focos_ativos else "rgba(255, 0, 0, 0.7)"
 animacao = "none" if not focos_ativos else "pulse 1.5s infinite"
 
@@ -108,44 +108,59 @@ st.markdown(f"""
     .block-container {{ padding-top: 0rem; padding-bottom: 0rem; padding-left: 1rem; padding-right: 1rem; }}
     .stApp {{ background-color: #001233; }}
     
-    /* CABEÇALHO AMPLIADO */
+    /* CABEÇALHO COM FOCO EM CENTRALIZAÇÃO */
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 160px;
+        position: fixed; top: 0; left: 0; width: 100%; height: 120px;
         background: #001233; z-index: 999;
         border-bottom: 2px solid rgba(0, 212, 255, 0.5);
-        padding: 0 20px;
+        padding: 0 30px;
         display: flex;
         align-items: center;
+        justify-content: space-between; /* Relógio à esquerda, espaço vazio à direita */
     }}
 
-    /* RELÓGIO ZULU - AGORA REALMENTE GRANDE */
+    /* RELÓGIO ZULU - À ESQUERDA */
+    .time-block {{
+        display: flex;
+        align-items: center;
+        margin-right: auto; /* Empurra o resto para a direita */
+    }}
     .time-value {{ 
-        font-size: 8.5rem; 
+        font-size: 5rem; 
         color: white; 
         font-family: 'Courier New', monospace; 
         font-weight: 900; 
         line-height: 1;
-        margin-right: 30px;
         letter-spacing: -5px;
+        margin-right: 20px;
     }}
-    
     .local-box {{
         display: flex;
         flex-direction: column;
         justify-content: center;
     }}
-
-    .time-local {{ color: #ffcc00; font-size: 1.8rem; font-weight: bold; margin: 0; }}
+    .time-local {{ color: #ffcc00; font-size: 1.5rem; font-weight: bold; margin: 0; }}
     
+    /* TÍTULO - CENTRALIZADO NO MEIO EXATO */
     .title-text {{
         position: absolute;
-        right: 180px;
+        left: 50%;
+        transform: translateX(-50%); /* Centralização matemática perfeita */
         font-family: 'Arial Black', sans-serif; color: white;
-        font-size: 2.2rem; font-weight: 900; text-transform: uppercase;
+        font-size: 2.8rem; /* Ligeiramente maior que o relógio visualmente */
+        font-weight: 900; text-transform: uppercase;
         text-shadow: 0 0 15px #00d4ff;
+        white-space: nowrap; /* Impede quebra de linha */
     }}
 
-    .main-content {{ margin-top: 170px; }}
+    /* LOGO - À DIREITA */
+    .fixed-logo {{ 
+        margin-left: auto; /* Empurra para a direita */
+        display: flex;
+        align-items: center;
+    }}
+
+    .main-content {{ margin-top: 130px; }}
     
     .map-outer-frame {{
         padding: 2px; background: rgba(0, 0, 0, 0.2); border-radius: 10px;
@@ -160,24 +175,25 @@ st.markdown(f"""
         background: rgba(0, 30, 70, 0.4); border: 1px solid rgba(0, 212, 255, 0.3);
         border-radius: 8px; padding: 5px;
     }}
-    .fixed-logo {{ position: absolute; right: 30px; top: 15px; }}
     </style>
     """, unsafe_allow_html=True)
 
 # --- HEADER REESTRUTURADO ---
+logo_b64 = get_base64(ARQUIVO_BOLACHA)
+logo_html = f'<img src="data:image/png;base64,{logo_b64}" width="140">' if logo_b64 else ""
+
 st.markdown(f"""
     <div class="fixed-header">
-        <div class="time-value">{now_z.strftime('%H:%M:%S')}Z</div>
-        <div class="local-box">
-            <div class="time-local">LOCAL: {now_p.strftime('%H:%M')}P</div>
+        <div class="time-block">
+            <div class="time-value">{now_z.strftime('%H:%M:%S')}Z</div>
+            <div class="local-box">
+                <div class="time-local">LOCAL: {now_p.strftime('%H:%M')}P</div>
+            </div>
         </div>
         <div class="title-text">COOPERACIÓN XI</div>
+        <div class="fixed-logo">{logo_html}</div>
     </div>
     """, unsafe_allow_html=True)
-
-logo_b64 = get_base64(ARQUIVO_BOLACHA)
-if logo_b64:
-    st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="140"></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
