@@ -13,7 +13,7 @@ from streamlit_autorefresh import st_autorefresh
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(layout="wide", page_title="COOPERACIÓN XI - COI", page_icon="✈️")
 
-# --- AUTO-REFRESH (30 segundos) ---
+# --- AUTO-REFRESH ---
 st_autorefresh(interval=30000, limit=None, key="refresh_dashboard")
 
 # --- FUNCIONES AUXILIARES ---
@@ -58,7 +58,7 @@ df = load_data(URL_PLANILHA)
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
 
-# --- ESTILO CSS ---
+# --- ESTILO CSS AVANÇADO ---
 st.markdown(f"""
     <style>
     .stAppDeployButton {{ display: none !important; }}
@@ -66,34 +66,37 @@ st.markdown(f"""
     [data-testid="stHeader"], [data-testid="stToolbar"] {{ display: none !important; }}
     .stApp {{ background-color: #000b1e; color: white; }}
     .block-container {{ padding: 0 1.5rem; }}
+    
     .fixed-header {{
-        position: fixed; top: 0; left: 0; width: 100%; height: 110px;
+        position: fixed; top: 0; left: 0; width: 100%; height: 135px;
         background: rgba(0, 11, 30, 0.98); z-index: 999;
         display: flex; align-items: center; justify-content: space-between;
-        padding: 0 30px; border-bottom: 1px solid rgba(0, 212, 255, 0.2);
+        padding: 0 35px; border-bottom: 2px solid rgba(0, 212, 255, 0.3);
     }}
     .mission-title {{
         position: absolute; left: 50%; transform: translateX(-50%);
-        font-family: 'Arial Black', sans-serif; font-size: 2.3rem;
-        letter-spacing: 3px; text-shadow: 0 0 15px rgba(0, 212, 255, 0.5);
+        font-family: 'Arial Black', sans-serif; font-size: 2.6rem;
+        letter-spacing: 5px; color: #ffffff; text-shadow: 0 0 15px rgba(0, 212, 255, 0.6);
     }}
-    .main-content {{ margin-top: 125px; }}
+    .main-content {{ margin-top: 150px; }}
     .section-card {{
         background: rgba(0, 30, 70, 0.4); border: 1px solid rgba(0, 212, 255, 0.2);
-        border-radius: 10px; padding: 15px; margin-bottom: 15px;
+        border-radius: 12px; padding: 15px; margin-bottom: 20px;
     }}
+    /* Ajuste de largura automática para as tabelas */
+    [data-testid="stDataFrame"] {{ width: 100% !important; }}
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER ---
+# --- HEADER (BOLACHA AMPLIADA) ---
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
-logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="100">' if logo_b64 else ""
+logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="125">' if logo_b64 else ""
 
 st.markdown(f"""
     <div class="fixed-header">
         <div class="time-container">
-            <div style="font-size: 1.8rem; font-weight: 300;">{now_z.strftime('%H:%M')}Z</div>
-            <div style="font-size: 0.9rem; color: #ffcc00; font-weight: bold;">LOCAL: {now_p.strftime('%H:%M')}P</div>
+            <div style="font-size: 2rem; font-weight: 300; letter-spacing: 1px;">{now_z.strftime('%H:%M')}Z</div>
+            <div style="font-size: 1rem; color: #ffcc00; font-weight: bold;">LOCAL: {now_p.strftime('%H:%M')}P</div>
         </div>
         <div class="mission-title">COOPERACIÓN XI</div>
         <div class="logo-container">{logo_html}</div>
@@ -103,13 +106,13 @@ st.markdown(f"""
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
-    c_map, c_res = st.columns([2, 1])
+    # --- BLOCO SUPERIOR (MAPA E RESUMO DIREITO) ---
+    c_map, c_res = st.columns([2.2, 1])
     
     with c_map:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
-        st.markdown('<p style="color:#00ff7f; font-weight:bold; margin-bottom:10px;">📍 CONCIENCIA SITUACIONAL INTEGRADA</p>', unsafe_allow_html=True)
+        st.markdown('<p style="color:#00ff7f; font-weight:bold;">📍 CONCIENCIA SITUACIONAL</p>', unsafe_allow_html=True)
         
-        # TODOS OS FILTROS LIGADOS POR PADRÃO CONFORME SOLICITADO
         f1, f2, f3 = st.columns(3)
         show_aero = f1.toggle("✈️ Meios Aéreos", value=True)
         show_met = f2.toggle("☁️ Met", value=True)
@@ -124,23 +127,17 @@ if df is not None:
         
         for _, row in df[df['LAYER'].isin(active_layers)].iterrows():
             if row['lat_clean'] is not None:
-                # Definição de ícones por camada
-                if 'Meios' in row['LAYER']:
-                    icon_type, icon_color = 'plane', 'cadetblue'
-                elif 'Focos' in row['LAYER']:
-                    icon_type, icon_color = 'fire', 'red'
-                else:
-                    icon_type, icon_color = 'cloud', 'lightgray'
-                
+                icon_type = 'plane' if 'Meios' in row['LAYER'] else ('fire' if 'Focos' in row['LAYER'] else 'cloud')
+                icon_color = 'cadetblue' if 'Meios' in row['LAYER'] else ('red' if 'Focos' in row['LAYER'] else 'lightgray')
                 folium.Marker([row['lat_clean'], row['lon_clean']], 
-                              popup=f"{row['aeronave']} - {row['missao']}",
+                              popup=f"{row['aeronave']}",
                               icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')).add_to(m)
-        st_folium(m, width="100%", height=350, key="map_coi")
+        st_folium(m, width="100%", height=380, key="map_main")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c_res:
-        st.markdown('<div class="section-card" style="height: 485px;">', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold;">📊 VECTORES EM OPERAÇÃO</p>', unsafe_allow_html=True)
+        st.markdown('<div class="section-card" style="height: 520px;">', unsafe_allow_html=True)
+        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:1.1rem;">📊 VECTORES EN OPERACIÓN</p>', unsafe_allow_html=True)
         df_vuelo = df[df['LAYER'] == "Meios Aéreos"].groupby(['aeronave', 'missao'])['surtidas'].sum().reset_index()
         df_vuelo.columns = ['AERONAVE', 'MISIÓN', 'SALIDAS']
         st.dataframe(df_vuelo, hide_index=True, use_container_width=True)
@@ -158,16 +155,20 @@ if df is not None:
         st.plotly_chart(fig, use_container_width=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TABELA FINAL ---
+    # --- TABELA FINAL COM LARGURA AJUSTADA ---
     st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<p style="color:#00ff7f; font-weight:bold;">📋 LISTADO GENERAL DE MEDIOS AÉREOS</p>', unsafe_allow_html=True)
-    search_query = st.text_input("🔍 Filtro de Busca (Aeronave/Missão):", "")
+    st.markdown('<p style="color:#00ff7f; font-weight:bold;">📋 DETALLE GENERAL DE OPERACIONES</p>', unsafe_allow_html=True)
+    search_query = st.text_input("🔍 Filtro de Búsqueda Inteligente:", "")
+    
     df_final = df[df['LAYER'] == "Meios Aéreos"].copy()
     if search_query:
         df_final = df_final[df_final['aeronave'].str.contains(search_query, case=False, na=False) | 
                             df_final['missao'].str.contains(search_query, case=False, na=False)]
+    
     df_display = df_final[['aeronave', 'missao', 'surtidas', 'lat', 'lon']].copy()
     df_display.columns = ['AERONAVE', 'MISIÓN', 'SALIDAS', 'LAT', 'LON']
+    
+    # Configuração de colunas para ajuste automático ao conteúdo
     st.dataframe(df_display, use_container_width=True, hide_index=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
