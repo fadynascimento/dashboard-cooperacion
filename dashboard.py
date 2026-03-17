@@ -42,30 +42,21 @@ def get_base64(bin_file):
 URL_PLANILHA = "https://docs.google.com/spreadsheets/d/e/2PACX-1vSxvtVEGGjxGS316VCXhFUDv7AA9WaPSNql8ncUFu6Kn0d39BPr7XMS6WSSn8JJ6VAVDUAJ9AshQ1bi/pub?output=csv"
 ARQUIVO_BOLACHA = "bolcaha cooperacion.png"
 
-# --- CARREGAMENTO DE DADOS (VERSÃO BLINDADA) ---
+# --- CARREGAMENTO DE DADOS ---
 @st.cache_data(ttl=5)
 def load_data(url):
     try:
-        # Força o download ignorando o cache do Google
         df_raw = pd.read_csv(f"{url}&ts={int(time.time())}")
-        
-        # Saneamento de colunas: remove espaços e garante nomes corretos
         df_raw.columns = [c.strip() for c in df_raw.columns]
         
-        # Prevenção de erro caso a coluna LAYER não exista
-        if 'LAYER' not in df_raw.columns:
-            df_raw['LAYER'] = "Meios Aéreos"
-        
-        # Prevenção de erro caso outras colunas vitais faltem
-        for col in ['inicio_zulu', 'fim_zulu', 'lat', 'lon']:
+        # Garantia de colunas necessárias
+        required_cols = ['LAYER', 'inicio_zulu', 'fim_zulu', 'lat', 'lon', 'aeronave', 'missao', 'status_foco', 'horario_solucao']
+        for col in required_cols:
             if col not in df_raw.columns:
                 df_raw[col] = None
-
-        # Conversão de datas
+        
         df_raw['inicio_zulu'] = pd.to_datetime(df_raw['inicio_zulu'], errors='coerce').dt.tz_localize('UTC')
         df_raw['fim_zulu'] = pd.to_datetime(df_raw['fim_zulu'], errors='coerce').dt.tz_localize('UTC')
-        
-        # Processamento de coordenadas
         df_raw['lat_clean'] = df_raw['lat'].apply(parse_coordinate)
         df_raw['lon_clean'] = df_raw['lon'].apply(parse_coordinate)
         return df_raw
@@ -75,15 +66,18 @@ def load_data(url):
 
 df = load_data(URL_PLANILHA)
 
-# --- TEMPO (GMT-4 - CAMPO GRANDE) ---
+# --- TEMPO ---
 now_z = datetime.now(timezone.utc)
-fuso_papa = timezone(timedelta(hours=-4))
-now_p = datetime.now(fuso_papa)
+now_p = datetime.now(timezone(timedelta(hours=-4)))
 
-# --- LÓGICA DE ALERTA DE EMERGÊNCIA ---
+# --- LÓGICA DE ALERTA DE EMERGÊNCIA (COM MITIGAÇÃO) ---
 focos_ativos = False
 if df is not None:
-    focos_ativos = not df[df['LAYER'].str.contains("Focos Incd", case=False, na=False)].empty
+    # O alerta só pulsa se o LAYER for Focos Incd E o status NÃO for Extinto ou Controlado
+    focos_ativos = not df[
+        (df['LAYER'].str.contains("Focos Incd", case=False, na=False)) & 
+        (~df['status_foco'].str.contains("Extinto|Controlado", case=False, na=False))
+    ].empty
 
 # --- ESTILIZAÇÃO CSS ---
 borda_cor = "rgba(0, 255, 127, 0.4)" if not focos_ativos else "rgba(255, 0, 0, 0.7)"
@@ -101,42 +95,30 @@ st.markdown(f"""
     header {{ visibility: hidden; height: 0; }}
     footer {{ visibility: hidden; }}
     [data-testid="stHeader"], [data-testid="stDecoration"], [data-testid="stToolbar"] {{ display: none !important; }}
-
     .stApp {{ background-color: #001233; background-attachment: fixed; }}
-    
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; height: 95px;
-        background: rgba(0, 18, 51, 0.95); z-index: 999;
+        background: rgba(0, 18, 51, 0.85); z-index: 999;
         display: flex; align-items: center; justify-content: center;
         border-bottom: 2px solid rgba(0, 212, 255, 0.5); backdrop-filter: blur(10px);
     }}
-
     .title-text {{
         font-family: 'Arial Black', sans-serif; color: white; letter-spacing: 10px; 
         font-size: 2.2rem; font-weight: 900; text-transform: uppercase; text-shadow: 0 0 15px #00d4ff;
     }}
-
     .map-outer-frame {{
-        padding: 10px;
-        background: rgba(0, 0, 0, 0.2);
-        border-radius: 20px;
-        box-shadow: 0 0 20px {borda_cor};
-        border: 2px solid {borda_cor};
-        animation: {animacao};
-        margin-bottom: 10px;
+        padding: 10px; background: rgba(0, 0, 0, 0.2); border-radius: 20px;
+        box-shadow: 0 0 20px {borda_cor}; border: 2px solid {borda_cor};
+        animation: {animacao}; margin-bottom: 10px;
     }}
-
     .status-panel {{
         background: rgba(0, 30, 70, 0.3); border-radius: 15px; padding: 15px;
-        box-shadow: -10px 0 20px rgba(0, 0, 0, 0.5);
-        border: 1px solid rgba(0, 212, 255, 0.1);
+        box-shadow: -10px 0 20px rgba(0, 0, 0, 0.5); border: 1px solid rgba(0, 212, 255, 0.1);
     }}
-
     .timeline-card {{
         background: rgba(0, 30, 70, 0.4); border: 1px solid rgba(0, 212, 255, 0.3);
         border-radius: 12px; padding: 20px; box-shadow: 0 0 30px rgba(0, 212, 255, 0.15); margin-top: 20px;
     }}
-
     .fixed-logo {{ position: fixed; top: 5px; right: 25px; z-index: 1001; }}
     .main-content {{ margin-top: 110px; }}
     </style>
@@ -158,7 +140,6 @@ logo_b64 = get_base64(ARQUIVO_BOLACHA)
 if logo_b64:
     st.markdown(f'<div class="fixed-logo"><img src="data:image/png;base64,{logo_b64}" width="180"></div>', unsafe_allow_html=True)
 
-# --- CONTEÚDO PRINCIPAL ---
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 
 if df is not None:
@@ -168,7 +149,6 @@ if df is not None:
         st.markdown("<h4 style='color:#00ff7f;'>📍 CONSCIÊNCIA SITUACIONAL</h4>", unsafe_allow_html=True)
         st.markdown('<div class="map-outer-frame">', unsafe_allow_html=True)
         
-        # Filtros de Layer
         lt1, lt2, lt3 = st.columns(3)
         with lt1: show_met = st.toggle("☁️ Meteorologia", value=True)
         with lt2: show_foc = st.toggle("🔥 Focos Incd", value=True)
@@ -185,11 +165,17 @@ if df is not None:
         
         for _, row in df_filtered.iterrows():
             if row['lat_clean'] is not None and row['lon_clean'] is not None:
-                icon_map = {'Meteorologia': ('cloud', 'lightgray'), 'Focos Incd': ('fire', 'red'), 'Meios Aéreos': ('plane', 'cadetblue')}
+                # Cor dinâmica para o ícone de incêndio
+                fogo_extinto = str(row['status_foco']).lower() in ['extinto', 'controlado']
+                icon_map = {
+                    'Meteorologia': ('cloud', 'lightgray'), 
+                    'Focos Incd': ('fire', 'green' if fogo_extinto else 'red'), 
+                    'Meios Aéreos': ('plane', 'cadetblue')
+                }
                 icon_type, icon_color = icon_map.get(row['LAYER'], ('info-sign', 'blue'))
                 folium.Marker(
                     [row['lat_clean'], row['lon_clean']], 
-                    popup=f"<b>{row['aeronave']}</b><br>{row['missao']}", 
+                    popup=f"<b>{row['aeronave']}</b><br>Status: {row['status_foco'] if row['status_foco'] else 'N/A'}", 
                     icon=folium.Icon(color=icon_color, icon=icon_type, prefix='fa')
                 ).add_to(m)
         
@@ -199,46 +185,37 @@ if df is not None:
     with c2:
         st.markdown('<div class="status-panel">', unsafe_allow_html=True)
         st.markdown("<h4 style='color:#00d4ff; text-align:center;'>📊 STATUS OPERACIONAL</h4>", unsafe_allow_html=True)
-        
         df_ma = df[df['LAYER'] == "Meios Aéreos"]
         sm1, sm2 = st.columns(2)
         sm1.metric("VETORES", df_ma['aeronave'].nunique() if not df_ma.empty else 0)
         sm2.metric("MISSÕES", len(df_ma) if not df_ma.empty else 0)
         
-        st.write("**Resumo de Esforço Aéreo:**")
+        st.write("**Resumo por Aeronave e Missão:**")
         if not df_ma.empty:
-            df_resumo = df_ma.groupby('aeronave').size().reset_index(name='QTD')
+            df_resumo = df_ma.groupby(['aeronave', 'missao']).size().reset_index(name='QTD')
+            df_resumo.columns = ['AERONAVE', 'TIPO DE MISSÃO', 'QTD']
             st.dataframe(df_resumo, hide_index=True, use_container_width=True)
-        else:
-            st.info("Aguardando dados de vetores...")
+        
         st.markdown('</div>', unsafe_allow_html=True)
-
         if focos_ativos:
             st.error("🚨 FOCOS DE INCÊNDIO ATIVOS")
 
-    # --- TIMELINE ---
+    # --- GRÁFICO DE AÇÕES (Z) ---
     st.markdown('<div class="timeline-card">', unsafe_allow_html=True)
-    st.markdown(f"""<div style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom:10px;">PROJEÇÃO DE EMPREGO (Z)</div>""", unsafe_allow_html=True)
+    st.markdown(f"""<div style="text-align:center; color:#00d4ff; font-weight:bold; margin-bottom:10px;">AÇÕES (Z)</div>""", unsafe_allow_html=True)
     
     if not df_ma.empty and not df_ma['inicio_zulu'].isna().all():
         fig = px.timeline(df_ma, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", color="aeronave", text="missao", template="plotly_dark")
         fig.add_vline(x=now_z, line_width=3, line_color="#ff4b4b")
-        fig.update_layout(
-            xaxis_range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)],
-            paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,212,255,0.02)',
-            font_color="white", showlegend=False, height=300, margin=dict(l=10, r=10, t=0, b=10),
-            modebar_add=['zoomIn2d', 'zoomOut2d', 'pan2d', 'autoScale2d']
-        )
+        fig.update_layout(xaxis_range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)], paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,212,255,0.02)', font_color="white", showlegend=False, height=300, margin=dict(l=10, r=10, t=0, b=10))
         st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.info("Nenhuma missão na janela temporal atual.")
     st.markdown('</div>', unsafe_allow_html=True)
 
     # --- MANIFESTO ---
     st.markdown("<br><h4 style='color:#00d4ff;'>📝 MANIFESTO DE MISSÕES</h4>", unsafe_allow_html=True)
-    st.dataframe(df[['aeronave', 'missao', 'LAYER', 'inicio_zulu', 'fim_zulu']], use_container_width=True, hide_index=True)
+    st.dataframe(df[['aeronave', 'missao', 'LAYER', 'status_foco', 'horario_solucao', 'inicio_zulu', 'fim_zulu']], use_container_width=True, hide_index=True)
 
 else:
-    st.warning("🔄 Sincronizando com Google Sheets...")
+    st.warning("🔄 Sincronizando...")
 
 st.markdown('</div>', unsafe_allow_html=True)
