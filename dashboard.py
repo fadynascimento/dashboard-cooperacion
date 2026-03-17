@@ -30,14 +30,6 @@ def parse_coordinate(coord):
         return val
     except: return None
 
-def format_to_military(decimal_coord, is_lat=True):
-    if decimal_coord is None: return "N/A"
-    abs_val = abs(decimal_coord)
-    degrees = int(abs_val)
-    minutes = int((abs_val - degrees) * 60)
-    designator = ("S" if decimal_coord < 0 else "N") if is_lat else ("W" if decimal_coord < 0 else "E")
-    return f"{degrees:02d}°{minutes:02d}'{designator}"
-
 def get_base64(bin_file):
     if os.path.exists(bin_file):
         with open(bin_file, 'rb') as f:
@@ -64,14 +56,14 @@ df = load_data(URL_PLANILHA)
 now_z = datetime.now(timezone.utc)
 now_p = datetime.now(timezone(timedelta(hours=-4)))
 
-# --- ESTILO CSS ---
+# --- ESTILO CSS (Ajustado para alinhamento lateral) ---
 st.markdown(f"""
     <style>
     .stAppDeployButton {{ display: none !important; }}
     header {{ visibility: hidden; height: 0; }}
     [data-testid="stHeader"], [data-testid="stToolbar"] {{ display: none !important; }}
     .stApp {{ background-color: #000b1e; color: white; }}
-    .block-container {{ padding: 0 1.5rem; }}
+    .block-container {{ padding: 10px 1.5rem; }}
 
     .fixed-header {{
         position: fixed; top: 0; left: 0; width: 100%; height: 80px;
@@ -85,11 +77,16 @@ st.markdown(f"""
         font-family: 'Arial Black', sans-serif; font-size: 2.2rem;
         letter-spacing: 3px; text-shadow: 0 0 10px rgba(0, 212, 255, 0.4);
     }}
-    .main-content {{ margin-top: 95px; }}
+    .main-content {{ margin-top: 90px; }}
+    
     .section-card {{
         background: rgba(0, 30, 70, 0.3); border: 1px solid rgba(0, 212, 255, 0.1);
-        border-radius: 8px; padding: 10px; margin-bottom: 15px;
+        border-radius: 8px; padding: 15px; margin-bottom: 15px;
+        height: 500px; /* Altura fixa para alinhar os elementos lado a lado */
     }}
+    
+    .metric-card {{ text-align: center; margin-bottom: 10px; }}
+    [data-testid="stMetricValue"] {{ font-size: 2.5rem !important; color: #00d4ff !important; }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -113,6 +110,7 @@ st.markdown('<div class="main-content">', unsafe_allow_html=True)
 if df is not None:
     # --- FILTROS E MAPA ---
     c1, c2 = st.columns([2.5, 1])
+    
     with c1:
         st.markdown('<div class="section-card">', unsafe_allow_html=True)
         f1, f2, f3 = st.columns(3)
@@ -126,47 +124,59 @@ if df is not None:
         if show_aero: active_layers.append("Meios Aéreos")
         
         m = folium.Map(location=[-18.5, -56.5], zoom_start=6, tiles='cartodbpositron', 
-                       zoom_control=False, attribution_control=False) # REMOVE ATRIBUIÇÃO
+                       zoom_control=True, attribution_control=False)
         
         for _, row in df[df['LAYER'].isin(active_layers)].iterrows():
-            if row['lat_clean'] is not None:
+            if row['lat_clean'] is not None and row['lon_clean'] is not None:
                 color = 'red' if 'Focos' in row['LAYER'] else 'blue'
                 icon = 'fire' if 'Focos' in row['LAYER'] else 'plane'
                 folium.Marker([row['lat_clean'], row['lon_clean']], 
                               popup=f"{row['aeronave']} - {row['missao']}",
                               icon=folium.Icon(color=color, icon=icon, prefix='fa')).add_to(m)
         
-        st_folium(m, width="100%", height=300, key="map_main")
+        # Altura ajustada para ocupar o card
+        st_folium(m, width="100%", height=360, key="map_main")
         st.markdown('</div>', unsafe_allow_html=True)
 
     with c2:
-        st.markdown('<div class="section-card" style="height: 385px;">', unsafe_allow_html=True)
-        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold;">📊 VECTORES</p>', unsafe_allow_html=True)
-        st.metric("EM OPERAÇÃO", len(df[df['LAYER']=='Meios Aéreos']))
-        st.dataframe(df[df['LAYER']=='Meios Aéreos'][['aeronave', 'missao']], hide_index=True, use_container_width=True)
+        st.markdown('<div class="section-card">', unsafe_allow_html=True)
+        st.markdown('<p style="text-align:center; color:#00d4ff; font-weight:bold; font-size:1.2rem; margin-bottom:5px;">📊 VECTORES</p>', unsafe_allow_html=True)
+        
+        # Dados filtrados para a tabela lateral
+        df_operacao = df[df['LAYER']=='Meios Aéreos'][['aeronave', 'missao']]
+        
+        st.metric("EM OPERAÇÃO", len(df_operacao))
+        
+        # Estilizando a visualização da tabela
+        st.dataframe(
+            df_operacao, 
+            hide_index=True, 
+            use_container_width=True,
+            height=300
+        )
         st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TIMELINE (AGORA CENTRALIZADA) ---
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
+    # --- TIMELINE ---
+    st.markdown('<div class="section-card" style="height: auto;">', unsafe_allow_html=True)
     df_timeline = df[df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     if not df_timeline.empty:
         fig = px.timeline(df_timeline, x_start="inicio_zulu", x_end="fim_zulu", y="aeronave", 
-                          color="aeronave", template="plotly_dark", height=200)
+                          color="aeronave", template="plotly_dark", height=250)
         fig.add_vline(x=now_z, line_width=3, line_color="#ff4b4b")
         fig.update_layout(
             showlegend=False, margin=dict(l=0, r=0, t=30, b=0),
             xaxis=dict(side="top", title=None, 
-                       range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)]), # CENTRALIZAÇÃO
+                       range=[now_z - timedelta(hours=4), now_z + timedelta(hours=4)]),
             yaxis=dict(title=None), paper_bgcolor='rgba(0,0,0,0)', plot_bgcolor='rgba(0,0,0,0)'
         )
         st.plotly_chart(fig, use_container_width=True, config={'displayModeBar': False})
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # --- TABELA DE DADOS REINTEGRADA ---
-    st.markdown('<div class="section-card">', unsafe_allow_html=True)
-    st.markdown('<p style="color:#00ff7f; font-weight:bold; font-size:0.8rem;">📋 DETALHAMENTO DE MISSÕES</p>', unsafe_allow_html=True)
+    # --- TABELA DE DADOS ---
+    st.markdown('<div class="section-card" style="height: auto;">', unsafe_allow_html=True)
+    st.markdown('<p style="color:#00ff7f; font-weight:bold; font-size:0.9rem;">📋 DETALHAMENTO DE MISSÕES</p>', unsafe_allow_html=True)
     st.dataframe(df[['LAYER', 'aeronave', 'missao', 'lat', 'lon']].dropna(subset=['aeronave']), 
-                 use_container_width=True, hide_index=True)
+                  use_container_width=True, hide_index=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown('</div>', unsafe_allow_html=True)
