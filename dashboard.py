@@ -4,7 +4,10 @@ import folium
 from streamlit_folium import st_folium
 import plotly.express as px
 from datetime import datetime, timezone, timedelta
-os, base64, time, re
+import os
+import base64
+import time
+import re
 from streamlit_autorefresh import st_autorefresh
 
 # --- CONFIGURACIÓN DE PÁGINA ---
@@ -15,9 +18,9 @@ st_autorefresh(interval=30000, limit=None, key="refresh_dashboard")
 
 # --- INICIALIZAÇÃO DO ESTADO DO MAPA (PERSISTÊNCIA) ---
 if 'map_center' not in st.session_state:
-    st.session_state.map_center = [-18.5, -56.5] # Coordenada inicial
+    st.session_state.map_center = [-18.5, -56.5] 
 if 'map_zoom' not in st.session_state:
-    st.session_state.map_zoom = 6 # Zoom inicial
+    st.session_state.map_zoom = 6 
 
 # --- FUNCIONES AUXILIARES ---
 def parse_coordinate(coord):
@@ -89,7 +92,7 @@ st.markdown(f"""
     </style>
     """, unsafe_allow_html=True)
 
-# --- HEADER ---
+# --- HEADER (BOLACHA 180PX) ---
 logo_b64 = get_base64(ARQUIVO_BOLACHA)
 logo_html = f'<img src="data:image/png;base64,{logo_b64}" height="180" style="margin-top: 40px;">' if logo_b64 else ""
 st.markdown(f'<div class="fixed-header"><div><div style="font-size: 2rem; font-weight: bold; color: #00d4ff;">{now_z.strftime("%H:%M")}Z</div><div style="font-size: 1rem; color: #ffcc00; font-weight: bold;">LOCAL: {now_p.strftime("%H:%M")}P</div></div><div style="font-size: 2.5rem; font-weight: bold; letter-spacing: 2px;">COOPERACIÓN XI</div><div class="logo-container">{logo_html}</div></div>', unsafe_allow_html=True)
@@ -108,7 +111,7 @@ if df is not None:
     show_foc = c_t1.toggle("🔥 Focos", value=True)
     show_aero = c_t2.toggle("✈️ Medios", value=True)
 
-    # 3. LÍNEA DEL TIEMPO (2h past / 2h future)
+    # 3. LÍNEA DEL TIEMPO (Zoom ±2h e Fontes Grandes)
     filtro_t = df['LAYER'].str.upper().isin(['MEIOS AÉREOS', 'REUNIÃO', 'REUNIÓN', 'REUNIAO'])
     df_t = df[filtro_t & df['inicio_zulu'].notna() & df['fim_zulu'].notna()].copy()
     if not df_t.empty:
@@ -118,9 +121,8 @@ if df is not None:
         fig.update_layout(showlegend=False, xaxis=dict(side="top", range=[now_z - timedelta(hours=2), now_z + timedelta(hours=2)], rangeslider=dict(visible=True, thickness=0.03)), margin=dict(l=10, r=10, t=60, b=10))
         st.plotly_chart(fig, use_container_width=True)
 
-    # 4. MAPA FLUTUANTE COM PERSISTÊNCIA
+    # 4. MAPA FLUTUANTE COM PERSISTÊNCIA DE ESTADO
     m = folium.Map(location=st.session_state.map_center, zoom_start=st.session_state.map_zoom, tiles='cartodbpositron', zoom_control=True)
-    
     for _, row in df.iterrows():
         if row['lat_clean'] and row['lon_clean']:
             if row['LAYER'] == 'Meios Aéreos' and show_aero:
@@ -130,15 +132,11 @@ if df is not None:
 
     with st.container():
         st.markdown('<div id="mapa-flutuante-container">', unsafe_allow_html=True)
-        # O pulo do gato: st_folium retorna os dados atuais do mapa (zoom e centro)
         map_data = st_folium(m, width=446, height=346, key="map_persist")
-        
-        # Se o usuário mexer no mapa, salvamos o novo estado para a próxima atualização
         if map_data['center'] is not None:
             st.session_state.map_center = [map_data['center']['lat'], map_data['center']['lng']]
         if map_data['zoom'] is not None:
             st.session_state.map_zoom = map_data['zoom']
-            
         st.markdown('</div>', unsafe_allow_html=True)
 
     # 5. VECTORES E DETALHE
